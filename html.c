@@ -8,6 +8,7 @@
 #include "params.h"
 #include "index.h"
 #include "buffer.h"
+#include "mime.h"
 #include "misc.h"
 #include "html.h"
 
@@ -87,11 +88,11 @@ int html_error(char *msg)
 		msg = "Internal server error";
 
 	if (html_flags & HTML_HEADER)
-		msg = concat("\n\n<title>The request has failed: ", msg,
+		msg = concat("\n<title>The request has failed: ", msg,
 		    "</title>\n"
 		    "<meta name=\"robots\" content=\"noindex\">\n", NULL);
 	else
-		msg = concat("\n\n<p>The request has failed: ", msg,
+		msg = concat("\n<p>The request has failed: ", msg,
 		    ".\n", NULL);
 
 	write_loop(STDOUT_FILENO, msg, strlen(msg));
@@ -106,13 +107,14 @@ int html_message(char *list,
 	unsigned int aday, n0, n2;
 	char *list_file, *idx_file;
 	off_t idx_offset;
-	int fd, error, got, trunc, prev, next, seen_nl;
+	int fd, error, got, trunc, prev, next;
 	idx_msgnum_t m0, m1, m1r;
 	struct idx_message idx_msg[3];
 	idx_off_t offset;
 	idx_size_t size;
 	struct buffer src, dst;
-	char c, *p, *q, *date, *from, *to, *subject, *body;
+	struct mime_ctx mime;
+	char *p, *q, *date, *from, *to, *subject, *body, *bend;
 
 	if (y < MIN_YEAR || y > MAX_YEAR ||
 	    m < 1 || m > 12 ||
@@ -235,57 +237,51 @@ int html_message(char *list,
 	error =
 	    lseek(fd, offset, SEEK_SET) != offset ||
 	    read_loop(fd, src.start, size) != size;
-	if (close(fd) || error) {
+	if (close(fd) || error || mime_init(&mime, &src)) {
 		buffer_free(&dst);
 		buffer_free(&src);
 		return html_error(NULL);
 	}
 
 	date = from = to = subject = body = NULL;
-	seen_nl = 1;
-	while (src.ptr < src.end - 9) {
-		c = *src.ptr++;
-
-		if (seen_nl)
-		switch (c) {
+	while (src.end - src.ptr > 9 && *src.ptr != '\n') {
+		switch (*src.ptr) {
 		case 'D':
 		case 'd':
-			if (!strncasecmp(src.ptr, "ate:", 4))
-				date = src.ptr - 1;
+			if (!strncasecmp(src.ptr, "Date:", 5)) {
+				date = mime_decode_header(&mime);
+				continue;
+			}
 			break;
 		case 'F':
 		case 'f':
-			if (!strncasecmp(src.ptr, "rom:", 4))
-				from = src.ptr - 1;
+			if (!strncasecmp(src.ptr, "From:", 5)) {
+				from = mime_decode_header(&mime);
+				continue;
+			}
 			break;
 		case 'T':
 		case 't':
-			if (!strncasecmp(src.ptr, "o:", 2))
-				to = src.ptr - 1;
+			if (!strncasecmp(src.ptr, "To:", 3)) {
+				to = mime_decode_header(&mime);
+				continue;
+			}
 			break;
 		case 'S':
 		case 's':
-			if (!strncasecmp(src.ptr, "ubject:", 2))
-				subject = src.ptr - 1;
-			break;
-		}
-
-		if (seen_nl && c != '\t' && src.ptr > src.start + 1)
-			*(src.ptr - 2) = '\0';
-
-		if (c == '\n') {
-			if (seen_nl) {
-				body = src.ptr;
-				break;
+			if (!strncasecmp(src.ptr, "Subject:", 8)) {
+				subject = mime_decode_header(&mime);
+				continue;
 			}
-			seen_nl = 1;
+			break;
+		case 'C':
+		case 'c':
+			mime_decode_header(&mime);
 			continue;
 		}
-
-		seen_nl = 0;
+		mime_skip_header(&mime);
 	}
-	if (src.ptr > src.start)
-		*(src.ptr - 1) = '\0';
+	if (*src.ptr == '\n') body = ++src.ptr;
 
 	if ((p = subject))
 	while ((p = strchr(p, '['))) {
@@ -296,7 +292,7 @@ int html_message(char *list,
 		memmove(--p, q, strlen(q) + 1);
 	}
 
-	buffer_appends(&dst, "\n\n");
+	buffer_appends(&dst, "\n");
 
 	if (html_flags & HTML_HEADER) {
 		buffer_appends(&dst, "<title>");
@@ -345,6 +341,33 @@ int html_message(char *list,
 			buffer_append_header(&dst, to);
 		if (subject)
 			buffer_append_header(&dst, subject);
+		if (mime.entities && mime.entities->boundary) {
+			mime_next_body_part(&mime);
+			do {
+				body = mime_next_body(&mime);
+				if (mime.entities->boundary)
+					body = NULL;
+				else
+				if (strncasecmp(mime.entities->type,
+				    "text/", 5) ||
+				    !strcasecmp(mime.entities->type,
+				    "text/html")) {
+					buffer_appends(&dst,
+					    "\n[ CONTENT OF TYPE ");
+					buffer_append_html(&dst,
+					    mime.entities->type,
+					    strlen(mime.entities->type));
+					buffer_appends(&dst, " SKIPPED ]\n\n");
+					body = NULL;
+				}
+				bend = mime_next_body_part(&mime);
+				if (body) {
+					buffer_appendc(&dst, '\n');
+					buffer_append_html(&dst,
+					    body, bend - body);
+				}
+			} while (bend < src.end);
+		} else
 		if (body) {
 			buffer_appendc(&dst, '\n');
 			buffer_append_html(&dst, body, src.end - body);
@@ -352,15 +375,18 @@ int html_message(char *list,
 		buffer_appends(&dst, "</pre>\n");
 
 		if (trunc)
-			buffer_appends(&dst, "[ TRUNCATED ]<br>\n");
+			buffer_appends(&dst, "[ TRUNCATED ]\n");
 	}
 
 	buffer_free(&src);
 
-	if (dst.error) {
+	if (mime.dst.error || dst.error) {
+		mime_free(&mime);
 		buffer_free(&dst);
 		return html_error(NULL);
 	}
+
+	mime_free(&mime);
 
 	write_loop(STDOUT_FILENO, dst.start, dst.ptr - dst.start);
 
@@ -404,7 +430,7 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 	if (close(fd) || error || buffer_init(&dst, 0))
 		return html_error(NULL);
 
-	buffer_appends(&dst, "\n\n");
+	buffer_appends(&dst, "\n");
 
 	if (html_flags & HTML_HEADER) {
 		buffer_appends(&dst, "<title>");
@@ -521,7 +547,7 @@ int html_year_index(char *list, unsigned int y)
 		return html_error(NULL);
 	}
 
-	buffer_appends(&dst, "\n\n");
+	buffer_appends(&dst, "\n");
 
 	if (html_flags & HTML_HEADER) {
 		buffer_appends(&dst, "<title>");
