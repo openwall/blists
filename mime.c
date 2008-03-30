@@ -135,6 +135,136 @@ static void process_header(struct mime_ctx *ctx, char *header)
 	} while (1);
 }
 
+static void decode_qp(struct buffer *dst, char *encoded, size_t length,
+    int header)
+{
+	unsigned char c, *p, *end;
+	unsigned int v;
+
+	p = (unsigned char *)encoded;
+	end = p + length;
+
+	while (p < end) {
+		c = *p++;
+		if (c == '_' && header)
+			c = 0x20; /* "hexadecimal 20" as per RFC 2047 */
+		else if (c == '=' && p < end) {
+			c = *p++;
+			if (c == '\n') continue;
+			if (c >= '0' && c <= '9' && p < end)
+				v = c - '0';
+			else if (c >= 'A' && c <= 'F' && p < end)
+				v = c - ('A' - 10);
+			else {
+				buffer_appendc(dst, '=');
+				p--;
+				continue;
+			}
+			v <<= 4;
+			c = *p++;
+			if (c >= '0' && c <= '9')
+				v |= c - '0';
+			else if (c >= 'A' && c <= 'F')
+				v |= c - ('A' - 10);
+			else {
+				buffer_appendc(dst, '=');
+				p -= 2;
+				continue;
+			}
+			c = v;
+		}
+		buffer_appendc(dst, c);
+	}
+}
+
+static void decode_base64(struct buffer *dst, char *encoded, size_t length)
+{
+	unsigned char c, *p, *end;
+	unsigned int i, v;
+
+	p = (unsigned char *)encoded;
+	end = p + length;
+
+	while (p < end) {
+		c = *p++;
+		if (c == '\n') continue;
+
+		if (end - p < 3) return;
+		i = 0;
+		v = 0;
+		do {
+			if (c >= 'A' && c <= 'Z')
+				v |= c - 'A';
+			else if (c >= 'a' && c <= 'z')
+				v |= c - ('a' - 26);
+			else if (c >= '0' && c <= '9')
+				v |= c - ('0' - 52);
+			else if (c == '+')
+				v |= 62;
+			else if (c == '/')
+				v |= 63;
+			else if (c == '=')
+				break;
+			else
+				return;
+			if (++i >= 4) break;
+			v <<= 6;
+			c = *p++;
+		} while (1);
+
+		switch (i) {
+		case 4:
+			buffer_appendc(dst, v >> 16);
+			buffer_appendc(dst, v >> 8);
+			buffer_appendc(dst, v);
+			continue;
+		case 3:
+			buffer_appendc(dst, v >> 16);
+			buffer_appendc(dst, v >> 8);
+			return;
+		case 2:
+			buffer_appendc(dst, v >> 10);
+		default:
+			return;
+		}
+	}
+}
+
+static void decode_header(struct buffer *dst, char *header, size_t length)
+{
+	char *done, *p, *q, *end, *charset, *encoding;
+
+	done = p = header;
+	end = header + length;
+
+	while (p < end) {
+		if (*p++ != '=') continue;
+		if (p >= end) break;
+		if (*p != '?') continue;
+		q = p;
+		charset = ++q;
+		while (q < end && *q++ != '?');
+		if (q >= end) continue;
+		encoding = q++;
+		if (q >= end) continue;
+		if (*q++ != '?') continue;
+		while (q < end && *q++ != '?');
+		if (q >= end) continue;
+		if (*q != '=') continue;
+		buffer_append(dst, done, --p - done);
+		done = ++q;
+		if (*encoding == 'Q' || *encoding == 'q')
+			decode_qp(dst, encoding + 2, q - encoding - 4, 1);
+		else if (*encoding == 'B' || *encoding == 'b')
+			decode_base64(dst, encoding + 2, q - encoding - 4);
+		else
+			done = p++;
+		p = done;
+	}
+
+	buffer_append(dst, done, end - done);
+}
+
 char *mime_decode_header(struct mime_ctx *ctx)
 {
 	char *header;
@@ -150,8 +280,7 @@ char *mime_decode_header(struct mime_ctx *ctx)
 
 	dst_offset = ctx->dst.ptr - ctx->dst.start;
 
-/* XXX: actually decode it */
-	buffer_append(&ctx->dst, header, length);
+	decode_header(&ctx->dst, header, length);
 	buffer_append(&ctx->dst, "", 1);
 	if (ctx->dst.error)
 		return NULL;
@@ -246,98 +375,6 @@ char *mime_skip_body(struct mime_ctx *ctx)
 	return find_next_boundary(ctx, 1);
 }
 
-static void decode_qp(struct buffer *dst, char *body, size_t length)
-{
-	unsigned char c, *p, *end;
-	unsigned int v;
-
-	p = (unsigned char *)body;
-	end = p + length;
-
-	while (p < end) {
-		c = *p++;
-		if (c == '=' && p < end) {
-			c = *p++;
-			if (c == '\n') continue;
-			if (c >= '0' && c <= '9' && p < end)
-				v = c - '0';
-			else if (c >= 'A' && c <= 'F' && p < end)
-				v = c - ('A' - 10);
-			else {
-				buffer_appendc(dst, '=');
-				p--;
-				continue;
-			}
-			v <<= 4;
-			c = *p++;
-			if (c >= '0' && c <= '9')
-				v |= c - '0';
-			else if (c >= 'A' && c <= 'F')
-				v |= c - ('A' - 10);
-			else {
-				buffer_appendc(dst, '=');
-				p -= 2;
-				continue;
-			}
-			c = v;
-		}
-		buffer_appendc(dst, c);
-	}
-}
-
-static void decode_base64(struct buffer *dst, char *body, size_t length)
-{
-	unsigned char c, *p, *end;
-	unsigned int i, v;
-
-	p = (unsigned char *)body;
-	end = p + length;
-
-	while (p < end) {
-		c = *p++;
-		if (c == '\n') continue;
-
-		if (end - p < 3) return;
-		i = 0;
-		v = 0;
-		do {
-			if (c >= 'A' && c <= 'Z')
-				v |= c - 'A';
-			else if (c >= 'a' && c <= 'z')
-				v |= c - ('a' - 26);
-			else if (c >= '0' && c <= '9')
-				v |= c - ('0' - 52);
-			else if (c == '+')
-				v |= 62;
-			else if (c == '/')
-				v |= 63;
-			else if (c == '=')
-				break;
-			else
-				return;
-			if (++i >= 4) break;
-			v <<= 6;
-			c = *p++;
-		} while (1);
-
-		switch (i) {
-		case 4:
-			buffer_appendc(dst, v >> 16);
-			buffer_appendc(dst, v >> 8);
-			buffer_appendc(dst, v);
-			continue;
-		case 3:
-			buffer_appendc(dst, v >> 16);
-			buffer_appendc(dst, v >> 8);
-			return;
-		case 2:
-			buffer_appendc(dst, v >> 10);
-		default:
-			return;
-		}
-	}
-}
-
 char *mime_decode_body(struct mime_ctx *ctx)
 {
 	char *body, *bend, *encoding;
@@ -355,7 +392,7 @@ char *mime_decode_body(struct mime_ctx *ctx)
 	dst_offset = ctx->dst.ptr - ctx->dst.start;
 
 	if (encoding && !strcasecmp(encoding, "quoted-printable"))
-		decode_qp(&ctx->dst, body, length);
+		decode_qp(&ctx->dst, body, length, 0);
 	else if (encoding && !strcasecmp(encoding, "base64"))
 		decode_base64(&ctx->dst, body, length);
 	else
