@@ -27,7 +27,7 @@ int main(void)
 	if (sscanf(p, "%u/%u/%u/%u%c", &y, &m, &d, &n, &c) >= 4 && !c)
 		return html_message(list, y, m, d, n);
 
-	if (sscanf(p, "%u/%u%c", &y, &m, &c) >= 2 && !c)
+	if (sscanf(p, "%u/%u/%c", &y, &m, &c) >= 2 && !c)
 		return html_index(list, y, m);
 
 	return html_error("Invalid request syntax");

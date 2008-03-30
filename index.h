@@ -5,9 +5,9 @@
 
 #include "params.h"
 
-#define N_ADAY ((MAX_YEAR - MIN_YEAR + 1) * 366)
+#define N_ADAY ((MAX_YEAR - MIN_YEAR + 1) * 12 * 31)
 
-typedef unsigned int idx_msgnum_t;
+typedef int idx_msgnum_t;
 typedef off_t idx_off_t;
 typedef off_t idx_size_t;
 typedef unsigned char idx_ymd_t;

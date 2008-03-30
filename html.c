@@ -122,24 +122,24 @@ int html_error(char *msg)
 int html_message(char *list,
 	unsigned int y, unsigned int m, unsigned int d, unsigned int n)
 {
-	unsigned int aday;
+	unsigned int aday, n0, n2;
 	char *list_file, *idx_file;
 	off_t idx_offset;
 	int fd, error, got, trunc, prev, next, seen_nl;
-	idx_msgnum_t m0, m1, m1r, n0, n2;
+	idx_msgnum_t m0, m1, m1r;
 	struct idx_message idx_msg[3];
 	idx_off_t offset;
 	idx_size_t size;
 	struct buffer src, dst;
 	unsigned char c;
-	char *date, *from, *to, *subject;
+	char *date, *from, *to, *subject, *body;
 
 	if (y < MIN_YEAR || y > MAX_YEAR ||
 	    m < 1 || m > 12 ||
 	    d < 1 || d > 31 ||
 	    n < 1 || n > 999999)
 		return html_error("Invalid date or message number");
-	aday = (y - MIN_YEAR) * 366 + (m - 1) * 31 + (d - 1);
+	aday = ((y - MIN_YEAR) * 12 + (m - 1)) * 31 + (d - 1);
 
 	list_file = concat(MAIL_SPOOL_PATH "/", list, NULL);
 	if (!list_file) return html_error(NULL);
@@ -165,10 +165,11 @@ int html_message(char *list,
 	if (error || m1 < 1 || m1 >= MAX_MAILBOX_MESSAGES) {
 		close(fd);
 		free(list_file);
-		return html_error((error || m1) ? NULL : "No such message");
+		return html_error((error || m1 > 0) ? NULL : "No such message");
 	}
 	m1r = m1 + n - (1 + 1); /* both m1 and n are 1-based; m1r is 0-based */
-	idx_offset = N_ADAY * sizeof(idx_msgnum_t) + m1r * sizeof(idx_msg[1]);
+	idx_offset = (N_ADAY + 1) * sizeof(idx_msgnum_t) +
+	    m1r * sizeof(idx_msg[1]);
 	prev = next = 1;
 	if (m1r >= 1) {
 		idx_offset -= sizeof(idx_msg[0]);
@@ -196,14 +197,17 @@ int html_message(char *list,
 	n0 = n - 1;
 	if (!n0 && prev && !error) {
 		aday =
-		    (unsigned int)idx_msg[0].y * 366 +
-		    ((unsigned int)idx_msg[0].m - 1) * 31 +
+		    ((unsigned int)idx_msg[0].y * 12 +
+		    ((unsigned int)idx_msg[0].m - 1)) * 31 +
 		    ((unsigned int)idx_msg[0].d - 1);
 		idx_offset = aday * sizeof(m0);
 		error =
 		    lseek(fd, idx_offset, SEEK_SET) != idx_offset ||
 		    read_loop(fd, (char *)&m0, sizeof(m0)) != sizeof(m0);
-		n0 = m1 - m0;
+		if (m1 > m0)
+			n0 = m1 - m0;
+		else
+			error = 1;
 	}
 
 	if (close(fd) || error) {
@@ -232,7 +236,7 @@ int html_message(char *list,
 		free(list_file);
 		return html_error(NULL);
 	}
-	if (buffer_alloc(&dst, size * 10 + 1000)) { /* XXX */
+	if (buffer_alloc(&dst, size * 10 + 1500)) { /* XXX */
 		buffer_free(&src);
 		free(list_file);
 		return html_error(NULL);
@@ -257,20 +261,23 @@ int html_message(char *list,
 	buffer_append(&dst, "\n\n", 2);
 	if (prev) {
 		snprintf(dst.ptr, 250, /* XXX */
-		    "<a href=\"/lists/%s/%u/%02u/%02u/%u\">[&lt;prev]</a>",
-		    list,
+		    "<a href=\"../../../%u/%02u/%02u/%u\">[&lt;prev]</a>",
 		    MIN_YEAR + idx_msg[0].y, idx_msg[0].m, idx_msg[0].d, n0);
 		dst.ptr += strlen(dst.ptr);
 	}
 	if (next) {
 		snprintf(dst.ptr, 250, /* XXX */
-		    "%s<a href=\"/lists/%s/%u/%02u/%02u/%u\">[next&gt;]</a>",
-		    prev ? " " : "", list,
+		    "%s<a href=\"../../../%u/%02u/%02u/%u\">[next&gt;]</a>",
+		    prev ? " " : "",
 		    MIN_YEAR + idx_msg[2].y, idx_msg[2].m, idx_msg[2].d, n2);
 		dst.ptr += strlen(dst.ptr);
 	}
 
-	date = from = to = subject = NULL;
+	if (prev || next)
+		buffer_appendc(&dst, ' ');
+	buffer_append(&dst, "<a href=\"..\">[month]</a>", 24);
+
+	date = from = to = subject = body = NULL;
 	seen_nl = 1;
 	while (src.ptr < src.end - 9) {
 		c = (unsigned char)*src.ptr++;
@@ -303,7 +310,10 @@ int html_message(char *list,
 			*(src.ptr - 2) = '\0';
 
 		if (c == '\n') {
-			if (seen_nl) break;
+			if (seen_nl) {
+				body = src.ptr;
+				break;
+			}
 			seen_nl = 1;
 			continue;
 		}
@@ -322,8 +332,10 @@ int html_message(char *list,
 		buffer_append_header(&dst, to);
 	if (subject)
 		buffer_append_header(&dst, subject);
-	buffer_appendc(&dst, '\n');
-	buffer_append_html(&dst, src.ptr, src.end - src.ptr);
+	if (body) {
+		buffer_appendc(&dst, '\n');
+		buffer_append_html(&dst, body, src.end - body);
+	}
 	buffer_append(&dst, "</pre>\n", 7);
 
 	buffer_free(&src);
@@ -340,17 +352,17 @@ int html_message(char *list,
 
 int html_index(char *list, unsigned int y, unsigned int m)
 {
-	unsigned int d, n, aday, dp, count;
+	unsigned int d, n, aday, dp;
 	char *idx_file;
 	off_t idx_offset;
 	int fd, error;
-	idx_msgnum_t mn[32], mp;
+	idx_msgnum_t mn[32], mp, count, total;
 	struct buffer dst;
 
 	if (y < MIN_YEAR || y > MAX_YEAR ||
 	    m < 1 || m > 12)
 		return html_error("Invalid date");
-	aday = (y - MIN_YEAR) * 366 + (m - 1) * 31;
+	aday = ((y - MIN_YEAR) * 12 + (m - 1)) * 31;
 
 	idx_file = concat(MAIL_SPOOL_PATH "/", list,
 	    INDEX_FILENAME_SUFFIX, NULL);
@@ -371,32 +383,50 @@ int html_index(char *list, unsigned int y, unsigned int m)
 	if (close(fd) || error)
 		return html_error(NULL);
 
-	if (buffer_alloc(&dst, 100000)) /* XXX */
+	if (buffer_alloc(&dst, 1000000)) /* XXX */
 		return html_error(NULL);
 
 	buffer_append(&dst, "\n\n", 2);
 
+	sprintf(dst.ptr, "<p><h2>%04u/%02u\n</h2><p>", y, m);
+	dst.ptr += strlen(dst.ptr); /* XXX */
+
+	total = 0;
 	dp = 0;
 	mp = mn[0];
 	for (d = 1; d <= 31; d++) {
-		if (mn[d]) {
-			if (mp) {
+		if (!mn[d]) continue;
+		if (mp > 0) {
+			if (mn[d] > 0)
 				count = mn[d] - mp;
-				sprintf(dst.ptr, "<b>%u</b>:", dp + 1);
-				dst.ptr += strlen(dst.ptr); /* XXX */
-				for (n = 1; n <= count; n++) {
-					snprintf(dst.ptr, 250,
-					    " <a href=\"/lists/%s/%u/%02u"
-					    "/%02u/%u\">%u</a>",
-					    list, y, m, dp + 1, n, n);
-					dst.ptr += strlen(dst.ptr); /* XXX */
-				}
-				buffer_append(&dst, "<br>\n", 5);
+			else
+				count = -mn[d];
+			if (count <= 0) {
+				buffer_free(&dst);
+				return html_error(NULL);
 			}
-			mp = mn[d];
-			dp = d;
+			total += count;
+			if (count > 999) count = 999;
+			sprintf(dst.ptr, "<b>%u</b>:", dp + 1);
+			dst.ptr += strlen(dst.ptr); /* XXX */
+			for (n = 1; n <= count; n++) {
+				snprintf(dst.ptr, 250,
+				    " <a href=\"%02u/%u\">%u</a>",
+				    dp + 1, n, n);
+				dst.ptr += strlen(dst.ptr); /* XXX */
+			}
+			buffer_append(&dst, "<br>\n", 5);
 		}
+		mp = mn[d];
+		dp = d;
 	}
+
+	if (total) {
+		sprintf(dst.ptr, "<p>%u message%s\n",
+		    total, total == 1 ? "" : "s");
+		dst.ptr += strlen(dst.ptr); /* XXX */
+	} else
+		buffer_append(&dst, "No messages\n", 12);
 
 	write_loop(STDOUT_FILENO, dst.start, dst.ptr - dst.start);
 

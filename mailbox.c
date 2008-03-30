@@ -5,6 +5,7 @@
 #define _XOPEN_SOURCE
 #include <unistd.h>
 #include <fcntl.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -17,8 +18,9 @@
 
 static int idx_fd;
 
+static unsigned int prev_aday;
 static idx_msgnum_t msg_num;
-static idx_msgnum_t n_by_aday[N_ADAY];
+static idx_msgnum_t num_by_aday[N_ADAY + 1], cnt_by_aday[N_ADAY];
 
 struct message {
 	idx_off_t raw_offset;	/* Raw, with the "From " line */
@@ -49,15 +51,26 @@ static int message_process(struct message *msg)
 
 	aday = 0;
 	if (msg->tm.tm_year) {
-		aday = (msg->tm.tm_year - (MIN_YEAR - 1900)) * 366 +
-		    msg->tm.tm_mon * 31 +
+		aday =
+		    (((unsigned int)msg->tm.tm_year - (MIN_YEAR - 1900)) * 12 +
+		    (unsigned int)msg->tm.tm_mon) * 31 +
 		    (msg->tm.tm_mday - 1);
 		if (aday < 0 || aday >= N_ADAY) aday = 0;
 	}
 
+	if (aday < prev_aday)
+		fprintf(stderr, "Warning: date went backwards: %u -> %u"
+		    " (%04u/%02u/%02u)\n",
+		    prev_aday, aday,
+		    (unsigned int)msg->tm.tm_year + 1900,
+		    msg->tm.tm_mon + 1,
+		    msg->tm.tm_mday);
+	prev_aday = aday;
+
 	msg_num++;
-	if (!n_by_aday[aday])
-		n_by_aday[aday] = msg_num;
+	if (!num_by_aday[aday])
+		num_by_aday[aday] = msg_num;
+	cnt_by_aday[aday]++;
 
 	return
 		write_loop(idx_fd, (char *)&idx_msg, sizeof(idx_msg))
@@ -290,6 +303,7 @@ int mailbox_parse(char *mailbox)
 	int fd;
 	char *idx;
 	int error;
+	unsigned int aday;
 
 	fd = open(mailbox, O_RDONLY);
 	if (fd < 0) return 1;
@@ -303,12 +317,14 @@ int mailbox_parse(char *mailbox)
 	}
 
 	msg_num = 0;
-	memset(n_by_aday, 0, sizeof(n_by_aday));
+	prev_aday = 0;
+	memset(num_by_aday, 0, sizeof(num_by_aday));
+	memset(cnt_by_aday, 0, sizeof(cnt_by_aday));
 
 	if (!error)
 		error =
-		    write_loop(idx_fd, (char *)n_by_aday, sizeof(n_by_aday))
-		    != sizeof(n_by_aday);
+		    write_loop(idx_fd, (char *)num_by_aday, sizeof(num_by_aday))
+		    != sizeof(num_by_aday);
 
 	if (!error)
 		error = lock_fd(fd, 1);
@@ -322,10 +338,14 @@ int mailbox_parse(char *mailbox)
 	if (!error)
 		error = lseek(idx_fd, 0, SEEK_SET) != 0;
 
-	if (!error)
+	if (!error) {
+		for (aday = 1; aday <= N_ADAY; aday++)
+			if (!num_by_aday[aday])
+				num_by_aday[aday] = -cnt_by_aday[aday - 1];
 		error =
-		    write_loop(idx_fd, (char *)n_by_aday, sizeof(n_by_aday))
-		    != sizeof(n_by_aday);
+		    write_loop(idx_fd, (char *)num_by_aday, sizeof(num_by_aday))
+		    != sizeof(num_by_aday);
+	}
 
 	return error;
 }
