@@ -5,6 +5,8 @@
 #ifndef _BLISTS_MISC_H
 #define _BLISTS_MISC_H
 
+#include <sys/types.h>
+
 #if 0
 /*
  * A select(2)-based sleep() equivalent: no more problems with SIGALRM,

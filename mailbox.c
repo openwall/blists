@@ -17,14 +17,14 @@
 
 static int idx_fd;
 
-static int msg_num;
-static int n_by_aday[N_ADAY];
+static idx_msgnum_t msg_num;
+static idx_msgnum_t n_by_aday[N_ADAY];
 
 struct message {
-	unsigned long raw_offset;	/* Raw, with the "From " line */
-	unsigned long raw_size;
-	unsigned long data_offset;	/* Just the message itself */
-	unsigned long data_size;
+	idx_off_t raw_offset;	/* Raw, with the "From " line */
+	idx_off_t data_offset;	/* Just the message itself */
+	idx_size_t raw_size;
+	idx_size_t data_size;
 	struct tm tm;
 };
 
@@ -90,11 +90,10 @@ static int eq(char *s1, int n1, char *s2, int n2)
 static int mailbox_parse_fd(int fd)
 {
 	struct stat stat;			/* File information */
-	unsigned long mailbox_size;		/* Its original size */
 	struct message msg;			/* Message being parsed */
 	char *file_buffer, *line_buffer;	/* Our internal buffers */
-	unsigned long file_offset, line_offset;	/* Their offsets in the file */
-	unsigned long offset;			/* A line fragment's offset */
+	off_t file_offset, line_offset;		/* Their offsets in the file */
+	off_t offset;				/* A line fragment's offset */
 	char *current, *next, *line;		/* Line pointers */
 	int block, saved, extra, length;	/* Internal block sizes */
 	int done, start, end;			/* Various boolean flags: */
@@ -103,9 +102,8 @@ static int mailbox_parse_fd(int fd)
 	if (fstat(fd, &stat)) return 1;
 
 	if (!S_ISREG(stat.st_mode)) return 1;
+	if (!stat.st_size) return 0;
 	if (stat.st_size > MAX_MAILBOX_BYTES || stat.st_size > ~0UL) return 1;
-	mailbox_size = stat.st_size;
-	if (!mailbox_size) return 0;
 
 	memset(&msg, 0, sizeof(msg));
 
@@ -277,7 +275,7 @@ static int mailbox_parse_fd(int fd)
 
 	if (done) {
 /* Process the last message */
-		if (offset != mailbox_size) return 1;
+		if (offset != stat.st_size) return 1;
 		if (!msg.data_offset) return 1;
 		msg.raw_size = offset - msg.raw_offset;
 		msg.data_size = offset - (blank & body) - msg.data_offset;

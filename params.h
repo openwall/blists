@@ -5,10 +5,9 @@
  * The directory with mailboxes and index files, used by the CGI program
  * only.  (bindex assumes that full pathnames are supplied to it.)
  */
-// #define MAIL_SPOOL_PATH			"../../blists"
-#define MAIL_SPOOL_PATH "."
+#define MAIL_SPOOL_PATH			"../../blists"
 
-#define MIN_YEAR			2000
+#define MIN_YEAR			1990
 #define MAX_YEAR			2009
 
 /*

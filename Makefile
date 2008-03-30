@@ -8,7 +8,7 @@ LDFLAGS = -s
 PROJ = bindex bit
 OBJS_COMMON = misc.o
 OBJS_BINDEX = bindex.o mailbox.o
-OBJS_BIT = bit.o
+OBJS_BIT = bit.o html.o
 
 all: $(PROJ)
 
@@ -19,7 +19,8 @@ bit: $(OBJS_BIT) $(OBJS_COMMON)
 	$(LD) $(LDFLAGS) $(OBJS_BIT) $(OBJS_COMMON) -o $@
 
 bindex.o: mailbox.h
-bit.o: params.h index.h misc.h
+bit.o: params.h html.h
+html.o: params.h index.h misc.h
 mailbox.o: params.h index.h misc.h
 misc.o: params.h
 
