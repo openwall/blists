@@ -21,7 +21,7 @@ static int idx_fd;
 
 static unsigned int prev_aday;
 static idx_msgnum_t msg_num;
-static idx_msgnum_t num_by_aday[N_ADAY + 1], cnt_by_aday[N_ADAY];
+static idx_msgnum_t num_by_aday[N_ADAY + 1];
 
 struct message {
 	idx_off_t raw_offset;	/* Raw, with the "From " line */
@@ -35,6 +35,8 @@ static int message_process(struct message *msg)
 {
 	struct idx_message idx_msg;
 	unsigned int aday;
+
+	memset(&idx_msg, 0, sizeof(idx_msg));
 
 	idx_msg.offset = msg->data_offset;
 	idx_msg.size = msg->data_size;
@@ -69,9 +71,10 @@ static int message_process(struct message *msg)
 	prev_aday = aday;
 
 	msg_num++;
-	if (!num_by_aday[aday])
+	if (num_by_aday[aday] <= 0)
 		num_by_aday[aday] = msg_num;
-	cnt_by_aday[aday]++;
+	if (num_by_aday[++aday] <= 0)
+		num_by_aday[aday]--;
 
 	return
 		write_loop(idx_fd, (char *)&idx_msg, sizeof(idx_msg))
@@ -305,7 +308,6 @@ int mailbox_parse(char *mailbox)
 	char *idx;
 	off_t idx_size;
 	int error;
-	unsigned int aday;
 
 	fd = open(mailbox, O_RDONLY);
 	if (fd < 0) return 1;
@@ -321,7 +323,6 @@ int mailbox_parse(char *mailbox)
 	msg_num = 0;
 	prev_aday = 0;
 	memset(num_by_aday, 0, sizeof(num_by_aday));
-	memset(cnt_by_aday, 0, sizeof(cnt_by_aday));
 
 	if (!error)
 		error = lock_fd(fd, 1);
@@ -355,14 +356,10 @@ int mailbox_parse(char *mailbox)
 		error = idx_size == -1 || lseek(idx_fd, 0, SEEK_SET) != 0;
 	}
 
-	if (!error) {
-		for (aday = 1; aday <= N_ADAY; aday++)
-			if (!num_by_aday[aday])
-				num_by_aday[aday] = -cnt_by_aday[aday - 1];
+	if (!error)
 		error =
 		    write_loop(idx_fd, (char *)num_by_aday, sizeof(num_by_aday))
 		    != sizeof(num_by_aday);
-	}
 
 	if (!error)
 		error = ftruncate(idx_fd, idx_size) != 0;

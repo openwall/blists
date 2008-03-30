@@ -34,7 +34,8 @@ static void buffer_append_html(struct buffer *dst, char *what, size_t length)
 			break;
 		case '@':
 			if (ptr - 1 > what && ptr + 3 < end &&
-			    *(ptr - 2) >= ' ' && *ptr >= ' ') {
+			    *(ptr - 2) > ' ' && *ptr > ' ' &&
+			    *(ptr + 1) > ' ' && *(ptr + 2) > ' ') {
 				buffer_appends(dst, "@...");
 				ptr += 3;
 				break;
@@ -418,7 +419,7 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 
 		buffer_appends(&dst, "<p><h2>");
 		buffer_append_html(&dst, list, strlen(list));
-		buffer_appendf(&dst, " mailing list - %u/%02u</h2>\n<p>", y, m);
+		buffer_appendf(&dst, " mailing list - %u/%02u</h2>\n", y, m);
 
 		total = 0;
 		dp = 0;
@@ -434,6 +435,9 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 					buffer_free(&dst);
 					return html_error(NULL);
 				}
+				if (!total)
+					buffer_appends(&dst,
+					    "<p>Messages by day:\n<p>\n");
 				total += count;
 				if (count > 999) count = 999;
 				buffer_appendf(&dst, "<b>%u</b>:", dp + 1);
@@ -451,7 +455,7 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 			buffer_appendf(&dst, "<p>%u message%s\n",
 			    total, total == 1 ? "" : "s");
 		else
-			buffer_appends(&dst, "No messages\n");
+			buffer_appends(&dst, "<p>No messages\n");
 	}
 
 	if (dst.error) {
@@ -468,7 +472,7 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 
 int html_year_index(char *list, unsigned int y)
 {
-	unsigned int min_y, max_y, m, d, aday, rday;
+	unsigned int min_y, max_y, m, d, d1, aday, rday;
 	char *idx_file;
 	off_t idx_offset;
 	int fd, error;
@@ -537,15 +541,17 @@ int html_year_index(char *list, unsigned int y)
 		buffer_appends(&dst, " mailing list");
 		if (min_y == max_y)
 			buffer_appendf(&dst, " - %u", y);
-		buffer_appends(&dst, "</h2>\n<p>");
+		buffer_appends(&dst, "</h2>\n");
 
 		total = 0;
-		rday = 1;
-		mp = mn[0];
-		for (y = min_y; y <= max_y; y++) {
+		rday = (max_y - min_y + 1) * (12 * 31) + (31 + 1);
+		for (y = max_y; y >= min_y; y--) {
 			yearly_total = 0;
-			for (m = 1; m <= 12; m++) {
+			for (m = 12; m >= 1; m--) {
+				d1 = 0; /* never used */
 				monthly_total = 0;
+				rday -= 2 * 31;
+				mp = mn[rday - 1];
 				for (d = 1; d <= 31; d++, rday++) {
 					if (!mn[rday]) continue;
 					if (mp > 0) {
@@ -558,20 +564,35 @@ int html_year_index(char *list, unsigned int y)
 							free(mn);
 							return html_error(NULL);
 						}
+						d1 = d;
 						monthly_total += count;
 					}
 					mp = mn[rday];
 				}
 				if (monthly_total) {
+					if (!total && !yearly_total)
+						buffer_appends(&dst,
+						    "<p>Messages by month:\n"
+						    "<p>\n");
 					yearly_total += monthly_total;
 					buffer_appends(&dst, "<a href=\"");
 					if (min_y != max_y)
 						buffer_appendf(&dst, "%u/", y);
 					buffer_appendf(&dst,
-					    "%02u/\">%u/%02u</a>: "
-					    "%u message%s<br>\n",
-					    m, y, m, monthly_total,
-					    monthly_total == 1 ? "" : "s");
+					    "%02u/\">%u/%02u</a>: ",
+					    m, y, m);
+					if (monthly_total != 1) {
+						buffer_appendf(&dst,
+						    "%u messages<br>\n",
+						    monthly_total);
+						continue;
+					}
+					buffer_appends(&dst, "<a href=\"");
+					if (min_y != max_y)
+						buffer_appendf(&dst, "%u/", y);
+					buffer_appendf(&dst,
+					    "%02u/%02u/1\">1 message</a><br>\n",
+					    m, d1);
 				}
 			}
 			total += yearly_total;
@@ -583,7 +604,7 @@ int html_year_index(char *list, unsigned int y)
 			buffer_appendf(&dst, "<p>%u message%s\n",
 			    total, total == 1 ? "" : "s");
 		else
-			buffer_appends(&dst, "No messages\n");
+			buffer_appends(&dst, "<p>No messages\n");
 	}
 
 	if (dst.error) {
