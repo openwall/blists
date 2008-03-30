@@ -15,6 +15,7 @@ static int new_entity(struct mime_ctx *ctx)
 	entity->next = ctx->entities;
 	entity->type = "text/plain";
 	entity->boundary = NULL;
+	entity->encoding = NULL;
 	ctx->entities = entity;
 	ctx->depth++;
 
@@ -86,10 +87,17 @@ char *mime_skip_header(struct mime_ctx *ctx)
 	return p;
 }
 
-static void mime_process_header(struct mime_ctx *ctx, char *header)
+static void process_header(struct mime_ctx *ctx, char *header)
 {
 	struct mime_entity *entity;
 	char *p, *a, *v;
+
+	if (!strncasecmp(header, "Content-Transfer-Encoding:", 26)) {
+		p = header + 26;
+		while (*p == ' ' || *p == '\t' || *p == '\n') p++;
+		ctx->entities->encoding = p;
+		return;
+	}
 
 	if (strncasecmp(header, "Content-Type:", 13)) return;
 
@@ -129,31 +137,31 @@ static void mime_process_header(struct mime_ctx *ctx, char *header)
 
 char *mime_decode_header(struct mime_ctx *ctx)
 {
-	char *src_header, *dst_header;
-	size_t src_length, dst_offset;
+	char *header;
+	size_t length, dst_offset;
 
-	src_header = mime_skip_header(ctx);
-	if (!src_header)
+	header = mime_skip_header(ctx);
+	if (!header)
 		return NULL;
 
-	src_length = ctx->src->ptr - src_header;
-	if (src_length > 0 && src_header[src_length - 1] == '\n')
-		src_length--;
+	length = ctx->src->ptr - header;
+	if (length > 0 && header[length - 1] == '\n')
+		length--;
 
 	dst_offset = ctx->dst.ptr - ctx->dst.start;
 
 /* XXX: actually decode it */
-	buffer_append(&ctx->dst, src_header, src_length);
+	buffer_append(&ctx->dst, header, length);
 	buffer_append(&ctx->dst, "", 1);
 	if (ctx->dst.error)
 		return NULL;
 
-	dst_header = ctx->dst.start + dst_offset;
+	header = ctx->dst.start + dst_offset;
 
-	if (*dst_header == 'C' || *dst_header == 'c')
-		mime_process_header(ctx, dst_header);
+	if (*header == 'C' || *header == 'c')
+		process_header(ctx, header);
 
-	return dst_header;
+	return header;
 }
 
 static char *find_next_boundary(struct mime_ctx *ctx, int pre)
@@ -229,11 +237,82 @@ char *mime_next_body(struct mime_ctx *ctx)
 	return ctx->src->ptr;
 }
 
-char *mime_end_body_part(struct mime_ctx *ctx)
+char *mime_skip_body(struct mime_ctx *ctx)
 {
 /* Forget the last non-multipart content type processed */
 	if (!ctx->entities->boundary)
 		free_entities_to(ctx, ctx->entities->next);
 
 	return find_next_boundary(ctx, 1);
+}
+
+static void decode_qp(struct buffer *dst, char *body, size_t length)
+{
+	unsigned char c, *p, *end;
+	int v;
+
+	p = (unsigned char *)body;
+	end = p + length;
+
+	while (p < end) {
+		c = *p++;
+		if (c == '=' && p < end) {
+			c = *p++;
+			if (c == '\n') continue;
+			v = -1;
+			if (c >= '0' && c <= '9')
+				v = (c - '0') << 4;
+			else if (c >= 'A' && c <= 'F')
+				v = (c - ('A' - 10)) << 4;
+			if (v < 0 || p >= end) {
+				buffer_appendc(dst, '=');
+				p--;
+				continue;
+			}
+			c = *p++;
+			if (c >= '0' && c <= '9')
+				v |= c - '0';
+			else if (c >= 'A' && c <= 'F')
+				v |= c - ('A' - 10);
+			else {
+				buffer_appendc(dst, '=');
+				p -= 2;
+				continue;
+			}
+			c = v;
+		}
+		buffer_appendc(dst, c);
+	}
+}
+
+char *mime_decode_body(struct mime_ctx *ctx)
+{
+	char *body, *bend;
+	size_t length, dst_offset;
+	enum {NONE, QP, B64} encoding;
+
+	encoding = NONE;
+	if (ctx->entities->encoding) {
+		if (!strcasecmp(ctx->entities->encoding, "quoted-printable"))
+			encoding = QP;
+	}
+
+	body = ctx->src->ptr;
+	bend = mime_skip_body(ctx);
+	if (!bend)
+		return NULL;
+
+	length = bend - body;
+
+	dst_offset = ctx->dst.ptr - ctx->dst.start;
+
+/* XXX: actually decode it */
+	if (encoding == QP)
+		decode_qp(&ctx->dst, body, length);
+	else
+		buffer_append(&ctx->dst, body, length);
+	if (ctx->dst.error)
+		return NULL;
+
+	return ctx->dst.start + dst_offset;
 }

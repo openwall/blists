@@ -11,7 +11,7 @@
 
 struct mime_entity {
 	struct mime_entity *next;
-	char *type, *boundary;
+	char *type, *boundary, *encoding;
 };
 
 struct mime_ctx {
@@ -28,6 +28,7 @@ extern char *mime_decode_header(struct mime_ctx *ctx);
 
 extern char *mime_next_body_part(struct mime_ctx *ctx);
 extern char *mime_next_body(struct mime_ctx *ctx);
-extern char *mime_end_body_part(struct mime_ctx *ctx);
+extern char *mime_skip_body(struct mime_ctx *ctx);
+extern char *mime_decode_body(struct mime_ctx *ctx);
 
 #endif

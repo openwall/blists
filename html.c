@@ -358,11 +358,18 @@ int html_message(char *list,
 				buffer_appends(&dst, " SKIPPED ]\n");
 				body = NULL;
 			}
-			bend = mime_end_body_part(&mime);
-			if (!bend) break;
-			if (!body) continue;
+			if (body) {
+				body = mime_decode_body(&mime);
+				if (!body) break;
+				bend = src.ptr;
+			} else {
+				bend = mime_skip_body(&mime);
+				if (!bend) break;
+				continue;
+			}
 			buffer_appendc(&dst, '\n');
-			buffer_append_html(&dst, body, bend - body);
+			buffer_append_html(&dst, body, mime.dst.ptr - body);
+			mime.dst.ptr = body;
 		} while (bend < src.end && mime.entities);
 		buffer_appends(&dst, "</pre>\n");
 
