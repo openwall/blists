@@ -286,7 +286,7 @@ int html_message(char *list,
 
 	if ((p = subject))
 	while ((p = strchr(p, '['))) {
-		if (strncmp(++p, list, strlen(list))) continue;
+		if (strncasecmp(++p, list, strlen(list))) continue;
 		q = p + strlen(list);
 		if (*q != ']') continue;
 		if (*++q == ' ') q++;
