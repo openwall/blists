@@ -313,20 +313,38 @@ int html_message(char *list,
 				buffer_appendf(&dst, "../../../%u/%02u/%02u/",
 				    MIN_YEAR + idx_msg[0].y,
 				    idx_msg[0].m, idx_msg[0].d);
-			buffer_appendf(&dst, "%u\">[&lt;prev]</a>", n0);
+			buffer_appendf(&dst, "%u\">[&lt;prev]</a> ", n0);
 		}
 		if (next) {
-			if (prev)
-				buffer_appendc(&dst, ' ');
 			buffer_appends(&dst, "<a href=\"");
 			if (n2 == 1)
 				buffer_appendf(&dst, "../../../%u/%02u/%02u/",
 				    MIN_YEAR + idx_msg[2].y,
 				    idx_msg[2].m, idx_msg[2].d);
-			buffer_appendf(&dst, "%u\">[next&gt;]</a>", n2);
+			buffer_appendf(&dst, "%u\">[next&gt;]</a> ", n2);
 		}
-		if (prev || next)
-			buffer_appendc(&dst, ' ');
+		if (idx_msg[1].t.pn) {
+			buffer_appends(&dst, "<a href=\"");
+			if (idx_msg[1].t.py != idx_msg[1].y ||
+			    idx_msg[1].t.pm != idx_msg[1].m ||
+			    idx_msg[1].t.pd != idx_msg[1].d)
+				buffer_appendf(&dst, "../../../%u/%02u/%02u/",
+				    MIN_YEAR + idx_msg[1].t.py,
+				    idx_msg[1].t.pm, idx_msg[1].t.pd);
+			buffer_appendf(&dst, "%u\">[&lt;thread-prev]</a> ",
+			    idx_msg[1].t.pn);
+		}
+		if (idx_msg[1].t.nn) {
+			buffer_appends(&dst, "<a href=\"");
+			if (idx_msg[1].t.ny != idx_msg[1].y ||
+			    idx_msg[1].t.nm != idx_msg[1].m ||
+			    idx_msg[1].t.nd != idx_msg[1].d)
+				buffer_appendf(&dst, "../../../%u/%02u/%02u/",
+				    MIN_YEAR + idx_msg[1].t.ny,
+				    idx_msg[1].t.nm, idx_msg[1].t.nd);
+			buffer_appendf(&dst, "%u\">[&lt;thread-next]</a> ",
+			    idx_msg[1].t.nn);
+		}
 		buffer_appends(&dst,
 		    "<a href=\"..\">[month]</a>"
 		    " <a href=\"../..\">[year]</a>"

@@ -13,6 +13,8 @@
 #include <sys/types.h>
 #include <time.h>
 
+#include "md5/md5.h"
+
 #include "params.h"
 #include "index.h"
 #include "misc.h"
@@ -22,12 +24,19 @@ static idx_msgnum_t num_by_aday[N_ADAY + 1];
 static idx_msgnum_t msg_num, msg_alloc;
 static struct idx_message *msgs;
 
-struct message {
+struct mem_message {
+	struct idx_message *msg;
+	struct mem_message *next_hash;
+};
+
+struct parsed_message {
 	idx_off_t raw_offset;	/* Raw, with the "From " line */
 	idx_off_t data_offset;	/* Just the message itself */
 	idx_size_t raw_size;
 	idx_size_t data_size;
 	struct tm tm;
+	idx_hash_t msgid_hash, irt_hash;
+	int have_msgid, have_irt;
 };
 
 static struct idx_message *msgs_grow(void)
@@ -57,7 +66,7 @@ static struct idx_message *msgs_grow(void)
 	return &msgs[msg_num++];
 }
 
-static int message_process(struct message *msg)
+static int message_process(struct parsed_message *msg)
 {
 	struct idx_message *idx_msg;
 
@@ -80,6 +89,110 @@ static int message_process(struct message *msg)
 		idx_msg->d = 1;
 	}
 
+	if (msg->have_msgid) {
+		memcpy(idx_msg->msgid_hash, msg->msgid_hash,
+		    sizeof(idx_msg->msgid_hash));
+		idx_msg->flags = IDX_F_HAVE_MSGID;
+	}
+	if (msg->have_irt) {
+		memcpy(idx_msg->irt_hash, msg->irt_hash,
+		    sizeof(idx_msg->irt_hash));
+		idx_msg->flags |= IDX_F_HAVE_IRT;
+	}
+
+	idx_msg->t.alast = -1;
+
+	return 0;
+}
+
+static int msgs_link(void)
+{
+	idx_msgnum_t i;
+	struct idx_message *m, *tl;
+	unsigned int aday;
+	struct mem_message *pool, **hash, *irt;
+	unsigned int hv;
+
+	pool = calloc(msg_num, sizeof(*pool));
+	if (!pool) return -1;
+	hash = calloc(0x10000, sizeof(*hash));
+	if (!hash) {
+		free(pool);
+		return -1;
+	}
+
+	for (i = 0, m = msgs; i < msg_num; i++, m++) {
+		if (!(m->flags & IDX_F_HAVE_MSGID)) continue;
+		pool[i].msg = m;
+		hv = m->msgid_hash[0] | ((unsigned int)m->msgid_hash[1] << 8);
+		pool[i].next_hash = hash[hv];
+		hash[hv] = &pool[i];
+	}
+
+	for (i = 0, m = msgs; i < msg_num; i++, m++) {
+		if (!(m->flags & IDX_F_HAVE_IRT)) continue;
+		hv = m->irt_hash[0] | ((unsigned int)m->irt_hash[1] << 8);
+		irt = hash[hv];
+		while (irt) {
+			if (!memcmp(m->irt_hash, irt->msg->msgid_hash,
+			    sizeof(idx_hash_t)))
+				break;
+			irt = irt->next_hash;
+		}
+		if (!irt) continue;
+
+		if (irt->msg->t.alast < 0) {
+			aday =
+			    ((unsigned int)m->y * 12 +
+			    ((unsigned int)m->m - 1)) * 31 +
+			    ((unsigned int)m->d - 1);
+			irt->msg->t.alast = m->t.alast = i;
+			irt->msg->t.ny = m->y;
+			irt->msg->t.nm = m->m;
+			irt->msg->t.nd = m->d;
+			irt->msg->t.nn = i + 2 - num_by_aday[aday];
+			aday =
+			    ((unsigned int)irt->msg->y * 12 +
+			    ((unsigned int)irt->msg->m - 1)) * 31 +
+			    ((unsigned int)irt->msg->d - 1);
+			m->t.py = irt->msg->y;
+			m->t.pm = irt->msg->m;
+			m->t.pd = irt->msg->d;
+			m->t.pn = irt - pool + 2 - num_by_aday[aday];
+		} else {
+			tl = &msgs[irt->msg->t.alast];
+			aday =
+			    ((unsigned int)tl->y * 12 +
+			    ((unsigned int)tl->m - 1)) * 31 +
+			    ((unsigned int)tl->d - 1);
+			m->t.py = tl->y;
+			m->t.pm = tl->m;
+			m->t.pd = tl->d;
+			m->t.pn = irt->msg->t.alast + 2 - num_by_aday[aday];
+			aday =
+			    ((unsigned int)m->y * 12 +
+			    ((unsigned int)m->m - 1)) * 31 +
+			    ((unsigned int)m->d - 1);
+			tl->t.ny = m->y;
+			tl->t.nm = m->m;
+			tl->t.nd = m->d;
+			tl->t.nn = i + 2 - num_by_aday[aday];
+			tl->t.alast = i;
+			irt->msg->t.alast = i;
+			while (tl->t.pn) {
+				aday =
+				    ((unsigned int)tl->t.py * 12 +
+				    ((unsigned int)tl->t.pm - 1)) * 31 +
+				    ((unsigned int)tl->t.pd - 1);
+				tl = &msgs[num_by_aday[aday] + tl->t.pn - 2];
+				tl->t.alast = i;
+			}
+		}
+	}
+
+	free(hash);
+	free(pool);
+
 	return 0;
 }
 
@@ -92,7 +205,7 @@ static int cmp_msgs_by_day(const void *p1, const void *p2)
 	return (int)m1->d - (int)m2->d;
 }
 
-static void msgs_final(void)
+static int msgs_final(void)
 {
 	idx_msgnum_t i;
 	struct idx_message *m;
@@ -123,9 +236,10 @@ retry:
 		if (num_by_aday[++aday] <= 0)
 			num_by_aday[aday]--;
 	}
+
+	return msgs_link();
 }
 
-#if 0
 /*
  * Checks if the buffer pointed to by s1, of n1 chars, starts with the
  * string s2, of n2 chars.
@@ -139,7 +253,6 @@ static int eq(char *s1, int n1, char *s2, int n2)
 	if (!memcmp(s1, s2, n2)) return 1;
 	return !strncasecmp(s1, s2, n2);
 }
-#endif
 
 /*
  * The mailbox parsing routine.
@@ -151,7 +264,8 @@ static int eq(char *s1, int n1, char *s2, int n2)
 static int mailbox_parse_fd(int fd)
 {
 	struct stat stat;			/* File information */
-	struct message msg;			/* Message being parsed */
+	struct parsed_message msg;		/* Message being parsed */
+	MD5_CTX hash;				/* A Message-ID digest */
 	char *file_buffer, *line_buffer;	/* Our internal buffers */
 	off_t file_offset, line_offset;		/* Their offsets in the file */
 	off_t offset;				/* A line fragment's offset */
@@ -293,6 +407,8 @@ static int mailbox_parse_fd(int fd)
 /* Now prepare for parsing the new one */
 			msg.raw_offset = offset;
 			msg.data_offset = 0;
+			msg.have_msgid = 0;
+			msg.have_irt = 0;
 			header = 1; body = 0;
 			continue;
 		}
@@ -321,15 +437,32 @@ static int mailbox_parse_fd(int fd)
 			continue;
 		}
 
-#if 0
-		if (start)
+		if (start && end)
 		switch (line[0]) {
-		case 'D':
-		case 'd':
-			eq(line, length, "Date:", 5);
+		case 'M':
+		case 'm':
+		case 'I':
+		case 'i':
+			if (eq(line, length, "Message-ID:", 11) ||
+			    eq(line, length, "In-Reply-To:", 12)) {
+				char *p = &line[11], *q, *e = line + length;
+				while (p < e && *p != '<') p++;
+				if (p >= e) break;
+				q = ++p;
+				while (q < e && *q != '>') q++;
+				if (q >= e || q - p < 4) break;
+				MD5_Init(&hash);
+				MD5_Update(&hash, p, q - p);
+				if (line[0] == 'M' || line[0] == 'm') {
+					MD5_Final(msg.msgid_hash, &hash);
+					msg.have_msgid = 1;
+				} else {
+					MD5_Final(msg.irt_hash, &hash);
+					msg.have_irt = 1;
+				}
+			}
 			break;
 		}
-#endif
 	} while (1);
 
 	free(file_buffer);
@@ -379,10 +512,11 @@ int mailbox_parse(char *mailbox)
 
 	if (close(fd) && !error) error = 1;
 
-	if (!error) {
-		msgs_final();
+	if (!error)
+		error = msgs_final();
+
+	if (!error)
 		error = lock_fd(idx_fd, 0);
-	}
 
 	if (!error)
 		error =
