@@ -16,12 +16,11 @@
 #include "params.h"
 #include "index.h"
 #include "misc.h"
+#include "mailbox.h"
 
-static int idx_fd;
-
-static unsigned int prev_aday;
-static idx_msgnum_t msg_num;
 static idx_msgnum_t num_by_aday[N_ADAY + 1];
+static idx_msgnum_t msg_num, msg_alloc;
+static struct idx_message *msgs;
 
 struct message {
 	idx_off_t raw_offset;	/* Raw, with the "From " line */
@@ -31,54 +30,99 @@ struct message {
 	struct tm tm;
 };
 
+static struct idx_message *msgs_grow(void)
+{
+	struct idx_message *new_msgs;
+	idx_msgnum_t new_num, new_alloc;
+	size_t new_size;
+
+	new_num = msg_num + 1;
+	if (new_num <= 0)
+		return NULL;
+
+	if (new_num > msg_alloc) {
+		new_alloc = msg_alloc + MSG_ALLOC_STEP;
+		if (new_num > new_alloc)
+			return NULL;
+		new_size = (size_t)new_alloc * sizeof(struct idx_message);
+		if (new_size / sizeof(struct idx_message) != new_alloc)
+			return NULL;
+		new_msgs = realloc(msgs, new_size);
+		if (!new_msgs)
+			return NULL;
+		msgs = new_msgs;
+		msg_alloc = new_alloc;
+	}
+
+	return &msgs[msg_num++];
+}
+
 static int message_process(struct message *msg)
 {
-	struct idx_message idx_msg;
-	unsigned int aday;
+	struct idx_message *idx_msg;
 
-	memset(&idx_msg, 0, sizeof(idx_msg));
+	idx_msg = msgs_grow();
+	if (!idx_msg) return -1;
 
-	idx_msg.offset = msg->data_offset;
-	idx_msg.size = msg->data_size;
+	memset(idx_msg, 0, sizeof(*idx_msg));
+
+	idx_msg->offset = msg->data_offset;
+	idx_msg->size = msg->data_size;
 
 	if (msg->tm.tm_year >= (MIN_YEAR - 1900) &&
 	    msg->tm.tm_year <= (MAX_YEAR - 1900)) {
-		idx_msg.y = msg->tm.tm_year - (MIN_YEAR - 1900);
-		idx_msg.m = msg->tm.tm_mon + 1;
-		idx_msg.d = msg->tm.tm_mday;
+		idx_msg->y = msg->tm.tm_year - (MIN_YEAR - 1900);
+		idx_msg->m = msg->tm.tm_mon + 1;
+		idx_msg->d = msg->tm.tm_mday;
 	} else {
-		idx_msg.y = 0;
-		idx_msg.m = 1;
-		idx_msg.d = 1;
+		idx_msg->y = 0;
+		idx_msg->m = 1;
+		idx_msg->d = 1;
 	}
 
-	aday = 0;
-	if (msg->tm.tm_year) {
+	return 0;
+}
+
+static int cmp_msgs_by_day(const void *p1, const void *p2)
+{
+	const struct idx_message *m1 = p1, *m2 = p2;
+
+	if (m1->y != m2->y) return (int)m1->y - (int)m2->y;
+	if (m1->m != m2->m) return (int)m1->m - (int)m2->m;
+	return (int)m1->d - (int)m2->d;
+}
+
+static void msgs_final(void)
+{
+	idx_msgnum_t i;
+	struct idx_message *m;
+	unsigned int aday, prev_aday;
+
+retry:
+	memset(num_by_aday, 0, sizeof(num_by_aday));
+
+	prev_aday = 0;
+	for (i = 0, m = msgs; i < msg_num; i++, m++) {
 		aday =
-		    (((unsigned int)msg->tm.tm_year - (MIN_YEAR - 1900)) * 12 +
-		    (unsigned int)msg->tm.tm_mon) * 31 +
-		    (msg->tm.tm_mday - 1);
-		if (aday < 0 || aday >= N_ADAY) aday = 0;
+		    ((unsigned int)m->y * 12 +
+		    ((unsigned int)m->m - 1)) * 31 +
+		    ((unsigned int)m->d - 1);
+
+		if (aday < prev_aday) {
+			fprintf(stderr, "Warning: date went backwards: "
+			    "%u -> %u (%04u/%02u/%02u), sorting... ",
+			    prev_aday, aday, MIN_YEAR + m->y, m->m, m->d);
+			qsort(msgs, msg_num, sizeof(*msgs), cmp_msgs_by_day);
+			fprintf(stderr, "done.\n");
+			goto retry;
+		}
+		prev_aday = aday;
+
+		if (num_by_aday[aday] <= 0)
+			num_by_aday[aday] = i + 1;
+		if (num_by_aday[++aday] <= 0)
+			num_by_aday[aday]--;
 	}
-
-	if (aday < prev_aday)
-		fprintf(stderr, "Warning: date went backwards: %u -> %u"
-		    " (%04u/%02u/%02u)\n",
-		    prev_aday, aday,
-		    (unsigned int)msg->tm.tm_year + 1900,
-		    msg->tm.tm_mon + 1,
-		    msg->tm.tm_mday);
-	prev_aday = aday;
-
-	msg_num++;
-	if (num_by_aday[aday] <= 0)
-		num_by_aday[aday] = msg_num;
-	if (num_by_aday[++aday] <= 0)
-		num_by_aday[aday]--;
-
-	return
-		write_loop(idx_fd, (char *)&idx_msg, sizeof(idx_msg))
-		    != sizeof(idx_msg);
 }
 
 #if 0
@@ -304,9 +348,10 @@ static int mailbox_parse_fd(int fd)
 
 int mailbox_parse(char *mailbox)
 {
-	int fd;
+	int fd, idx_fd;
 	char *idx;
 	off_t idx_size;
+	size_t msgs_size;
 	int error;
 
 	fd = open(mailbox, O_RDONLY);
@@ -321,28 +366,11 @@ int mailbox_parse(char *mailbox)
 	error = idx_fd < 0;
 
 	msg_num = 0;
-	prev_aday = 0;
-	memset(num_by_aday, 0, sizeof(num_by_aday));
+	msg_alloc = 0;
+	msgs = NULL;
 
 	if (!error)
 		error = lock_fd(fd, 1);
-	if (!error)
-		error = lock_fd(idx_fd, 0);
-
-	if (!error) {
-		idx_size = lseek(idx_fd, 0, SEEK_END);
-		if (idx_size >= sizeof(num_by_aday)) {
-			error =
-			    lseek(idx_fd, sizeof(num_by_aday), SEEK_SET)
-				!= sizeof(num_by_aday);
-		} else {
-			/* Avoid making the file sparse and later fragmented */
-			error =
-			    lseek(idx_fd, 0, SEEK_SET) != 0 ||
-			    write_loop(idx_fd, (char *)num_by_aday,
-				sizeof(num_by_aday)) != sizeof(num_by_aday);
-		}
-	}
 
 	if (!error) {
 		error = mailbox_parse_fd(fd);
@@ -352,14 +380,27 @@ int mailbox_parse(char *mailbox)
 	if (close(fd) && !error) error = 1;
 
 	if (!error) {
-		idx_size = lseek(idx_fd, 0, SEEK_CUR);
-		error = idx_size == -1 || lseek(idx_fd, 0, SEEK_SET) != 0;
+		msgs_final();
+		error = lock_fd(idx_fd, 0);
 	}
 
 	if (!error)
 		error =
 		    write_loop(idx_fd, (char *)num_by_aday, sizeof(num_by_aday))
 		    != sizeof(num_by_aday);
+
+	if (!error) {
+		msgs_size = msg_num * sizeof(struct idx_message);
+		error =
+		    write_loop(idx_fd, (char *)msgs, msgs_size) != msgs_size;
+	}
+
+	free(msgs);
+
+	if (!error) {
+		idx_size = lseek(idx_fd, 0, SEEK_CUR);
+		error = idx_size == -1;
+	}
 
 	if (!error)
 		error = ftruncate(idx_fd, idx_size) != 0;

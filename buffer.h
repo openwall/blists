@@ -3,7 +3,7 @@
 
 #include <sys/types.h>
 
-#define BUFFER_GROW_SIZE		0x8000
+#define BUFFER_GROW_STEP		0x8000
 #define BUFFER_GROW_MAX			0x1000000
 
 struct buffer {

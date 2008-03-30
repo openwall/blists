@@ -7,7 +7,7 @@
 
 int buffer_init(struct buffer *buf, size_t size)
 {
-	if (!size) size = BUFFER_GROW_SIZE;
+	if (!size) size = BUFFER_GROW_STEP;
 	buf->start = malloc(size);
 	if (!buf->start) {
 		buf->end = buf->ptr = buf->start;
@@ -34,7 +34,7 @@ static int buffer_grow(struct buffer *buf, size_t length)
 	if (length <= buf->end - buf->ptr) return 0;
 	if (length > BUFFER_GROW_MAX || !buf->start) return buf->error = -1;
 
-	new_size = buf->ptr - buf->start + length + BUFFER_GROW_SIZE;
+	new_size = buf->ptr - buf->start + length + BUFFER_GROW_STEP;
 	if (new_size > BUFFER_GROW_MAX) return buf->error = -1;
 	new_start = realloc(buf->start, new_size);
 	if (!new_start) return buf->error = -1;
