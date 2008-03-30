@@ -183,7 +183,7 @@ static char *find_next_boundary(struct mime_ctx *ctx, int pre)
 			p += 2;
 			entity = ctx->entities;
 			do {
-/* We must have been called for multipart entities only */
+/* We may be called for multipart entities only */
 				if (!entity->boundary) {
 					ctx->dst.error = -1;
 					return NULL;
@@ -249,7 +249,7 @@ char *mime_skip_body(struct mime_ctx *ctx)
 static void decode_qp(struct buffer *dst, char *body, size_t length)
 {
 	unsigned char c, *p, *end;
-	int v;
+	unsigned int v;
 
 	p = (unsigned char *)body;
 	end = p + length;
@@ -259,16 +259,16 @@ static void decode_qp(struct buffer *dst, char *body, size_t length)
 		if (c == '=' && p < end) {
 			c = *p++;
 			if (c == '\n') continue;
-			v = -1;
-			if (c >= '0' && c <= '9')
-				v = (c - '0') << 4;
-			else if (c >= 'A' && c <= 'F')
-				v = (c - ('A' - 10)) << 4;
-			if (v < 0 || p >= end) {
+			if (c >= '0' && c <= '9' && p < end)
+				v = c - '0';
+			else if (c >= 'A' && c <= 'F' && p < end)
+				v = c - ('A' - 10);
+			else {
 				buffer_appendc(dst, '=');
 				p--;
 				continue;
 			}
+			v <<= 4;
 			c = *p++;
 			if (c >= '0' && c <= '9')
 				v |= c - '0';
@@ -285,17 +285,65 @@ static void decode_qp(struct buffer *dst, char *body, size_t length)
 	}
 }
 
+static void decode_base64(struct buffer *dst, char *body, size_t length)
+{
+	unsigned char c, *p, *end;
+	unsigned int i, v;
+
+	p = (unsigned char *)body;
+	end = p + length;
+
+	while (p < end) {
+		c = *p++;
+		if (c == '\n') continue;
+
+		if (end - p < 3) return;
+		i = 0;
+		v = 0;
+		do {
+			if (c >= 'A' && c <= 'Z')
+				v |= c - 'A';
+			else if (c >= 'a' && c <= 'z')
+				v |= c - ('a' - 26);
+			else if (c >= '0' && c <= '9')
+				v |= c - ('0' - 52);
+			else if (c == '+')
+				v |= 62;
+			else if (c == '/')
+				v |= 63;
+			else if (c == '=')
+				break;
+			else
+				return;
+			if (++i >= 4) break;
+			v <<= 6;
+			c = *p++;
+		} while (1);
+
+		switch (i) {
+		case 4:
+			buffer_appendc(dst, v >> 16);
+			buffer_appendc(dst, v >> 8);
+			buffer_appendc(dst, v);
+			continue;
+		case 3:
+			buffer_appendc(dst, v >> 16);
+			buffer_appendc(dst, v >> 8);
+			return;
+		case 2:
+			buffer_appendc(dst, v >> 10);
+		default:
+			return;
+		}
+	}
+}
+
 char *mime_decode_body(struct mime_ctx *ctx)
 {
-	char *body, *bend;
+	char *body, *bend, *encoding;
 	size_t length, dst_offset;
-	enum {NONE, QP, B64} encoding;
 
-	encoding = NONE;
-	if (ctx->entities->encoding) {
-		if (!strcasecmp(ctx->entities->encoding, "quoted-printable"))
-			encoding = QP;
-	}
+	encoding = ctx->entities->encoding;
 
 	body = ctx->src->ptr;
 	bend = mime_skip_body(ctx);
@@ -306,9 +354,10 @@ char *mime_decode_body(struct mime_ctx *ctx)
 
 	dst_offset = ctx->dst.ptr - ctx->dst.start;
 
-/* XXX: actually decode it */
-	if (encoding == QP)
+	if (encoding && !strcasecmp(encoding, "quoted-printable"))
 		decode_qp(&ctx->dst, body, length);
+	else if (encoding && !strcasecmp(encoding, "base64"))
+		decode_base64(&ctx->dst, body, length);
 	else
 		buffer_append(&ctx->dst, body, length);
 	if (ctx->dst.error)

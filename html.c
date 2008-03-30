@@ -41,9 +41,10 @@ static void buffer_append_html(struct buffer *dst, char *what, size_t length)
 				ptr += 3;
 				break;
 			}
-		case '\n':
 		case '\t':
+		case '\n':
 			buffer_appendc(dst, c);
+		case '\r':
 			break;
 		default:
 			if ((c >= 0x20 && c <= 0x7e) || c >= 0xa0)
