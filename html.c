@@ -8,6 +8,37 @@
 #include "index.h"
 #include "misc.h"
 
+struct buffer {
+	char *start, *end, *ptr;
+};
+
+static int buffer_alloc(struct buffer *dst, size_t size)
+{
+	if (!size || !(dst->start = malloc(size))) return -1;
+	dst->end = dst->start + size;
+	dst->ptr = dst->start;
+	return 0;
+}
+
+static void buffer_free(struct buffer *dst)
+{
+	free(dst->start);
+}
+
+static void buffer_append(struct buffer *dst, char *what, size_t length)
+{
+	if (length > dst->end - dst->ptr) return;
+
+	memcpy(dst->ptr, what, length);
+	dst->ptr += length;
+}
+
+static void buffer_appendc(struct buffer *dst, char what)
+{
+	if (dst->ptr >= dst->end) return;
+	*(dst->ptr) = what;
+}
+
 /*
  * Attempts to read until EOF, and returns the number of bytes read.
  * We don't expect any signals, so even EINTR is considered an error.
@@ -47,14 +78,14 @@ int html_message(char *list,
 {
 	unsigned int aday;
 	char *list_file, *idx_file;
-	char *src, *dst, *sptr, *dptr;
-	unsigned char c;
 	off_t idx_offset;
 	int fd, error, got, trunc, prev, next, header;
 	idx_msgnum_t m0, m1, m1r, n0, n2;
 	struct idx_message idx_msg[3];
 	idx_off_t offset;
-	idx_size_t size_src, size_dst;
+	idx_size_t size;
+	struct buffer src, dst;
+	unsigned char c;
 
 	if (y < MIN_YEAR || y > MAX_YEAR ||
 	    m < 1 || m > 12 ||
@@ -143,20 +174,17 @@ int html_message(char *list,
 	}
 
 	offset = idx_msg[1].offset;
-	size_src = idx_msg[1].size;
+	size = idx_msg[1].size;
 
-	trunc = size_src > MAX_MESSAGE_SIZE;
+	trunc = size > MAX_MESSAGE_SIZE;
 	if (trunc)
-		size_src = MAX_MESSAGE_SIZE_TRUNC;
-	src = malloc(size_src);
-	if (!src) {
+		size = MAX_MESSAGE_SIZE_TRUNC;
+	if (buffer_alloc(&src, size)) {
 		free(list_file);
 		return html_error(NULL);
 	}
-	size_dst = size_src * 10 + 1000; /* XXX */
-	dst = malloc(size_dst);
-	if (!dst) {
-		free(src);
+	if (buffer_alloc(&dst, size * 10 + 1000)) { /* XXX */
+		buffer_free(&src);
 		free(list_file);
 		return html_error(NULL);
 	}
@@ -164,105 +192,88 @@ int html_message(char *list,
 	fd = open(list_file, O_RDONLY);
 	free(list_file);
 	if (fd < 0) {
-		free(dst);
-		free(src);
+		buffer_free(&dst);
+		buffer_free(&src);
 		return html_error(NULL);
 	}
 	error =
 	    lseek(fd, offset, SEEK_SET) != offset ||
-	    read_loop(fd, src, size_src) != size_src;
+	    read_loop(fd, src.start, size) != size;
 	if (close(fd) || error) {
-		free(dst);
-		free(src);
+		buffer_free(&dst);
+		buffer_free(&src);
 		return html_error(NULL);
 	}
 
-	dst[0] = '\n'; dst[1] = '\n';
-	dptr = dst + 2;
+	buffer_append(&dst, "\n\n", 2);
 	if (prev) {
-		snprintf(dptr, 250, /* XXX */
+		snprintf(dst.ptr, 250, /* XXX */
 		    "<a href=\"/lists/%s/%u/%02u/%02u/%u\">[&lt;prev]</a>",
 		    list,
 		    MIN_YEAR + idx_msg[0].y, idx_msg[0].m, idx_msg[0].d, n0);
-		dptr += strlen(dst);
+		dst.ptr += strlen(dst.ptr);
 	}
 	if (next) {
-		snprintf(dptr, 250, /* XXX */
+		snprintf(dst.ptr, 250, /* XXX */
 		    "%s<a href=\"/lists/%s/%u/%02u/%02u/%u\">[next&gt;]</a>",
 		    prev ? " " : "", list,
 		    MIN_YEAR + idx_msg[2].y, idx_msg[2].m, idx_msg[2].d, n2);
-		dptr += strlen(dst);
+		dst.ptr += strlen(dst.ptr);
 	}
-	memcpy(dptr, "\n<pre>\n", 7);
-	dptr += 7;
+	buffer_append(&dst, "\n<pre>\n", 7);
 
 	header = 1;
 
-	sptr = src;
-	while (sptr < src + size_src) {
-		if (dptr > dst + size_dst - 500) break; /* XXX */
-
-		switch ((c = (unsigned char)*sptr++)) {
+	while (src.ptr <= src.end) {
+		switch ((c = (unsigned char)*src.ptr++)) {
 		case '<':
-			if (header != 2) {
-				memcpy(dptr, "&lt;", 4);
-				dptr += 4;
-			}
+			if (header != 2) buffer_append(&dst, "&lt;", 4);
 			break;
 		case '>':
-			if (header != 2) {
-				memcpy(dptr, "&gt;", 4);
-				dptr += 4;
-			}
+			if (header != 2) buffer_append(&dst, "&gt;", 4);
 			break;
 		case '&':
-			if (header != 2) {
-				memcpy(dptr, "&amp;", 5);
-				dptr += 5;
-			}
+			if (header != 2) buffer_append(&dst, "&amp;", 5);
 			break;
 		case '\n':
 			if (header == 2) {
-				if (*sptr == '\t') break;
+				if (*src.ptr == '\t') break;
 				header = 1;
 			} else
-				*dptr++ = c;
+				buffer_appendc(&dst, c);
 			if (!header) break;
-			if (*sptr == '\n') {
+			if (*src.ptr == '\n') {
 				header = 0;
 				break;
 			}
-			if (!strncasecmp(sptr, "From:", 5)) break;
-			if (!strncasecmp(sptr, "To:", 3)) break;
-			if (!strncasecmp(sptr, "Date:", 5)) break;
-			if (!strncasecmp(sptr, "Subject:", 8)) break;
+			if (!strncasecmp(src.ptr, "From:", 5)) break;
+			if (!strncasecmp(src.ptr, "To:", 3)) break;
+			if (!strncasecmp(src.ptr, "Date:", 5)) break;
+			if (!strncasecmp(src.ptr, "Subject:", 8)) break;
 			header = 2;
 			break;
 		case '\t':
-			if (header != 2) *dptr++ = c;
+			if (header != 2) buffer_appendc(&dst, c);
 			break;
 		default:
 			if (header == 2) break;
 			if ((c >= 0x20 && c <= 0x7e) || c >= 0xa0)
-				*dptr++ = c;
+				buffer_appendc(&dst, c);
 			else
-				*dptr++ = '.';
+				buffer_appendc(&dst, '.');
 		}
 	}
 
-	free(src);
+	buffer_free(&src);
 
-	memcpy(dptr, "</pre>\n", 7);
-	dptr += 7;
+	buffer_append(&dst, "</pre>\n", 7);
 
-	if (trunc) {
-		memcpy(dptr, "[ TRUNCATED ]<br>\n", 18);
-		dptr += 18;
-	}
+	if (trunc)
+		buffer_append(&dst, "[ TRUNCATED ]<br>\n", 18);
 
-	write_loop(STDOUT_FILENO, dst, dptr - dst);
+	write_loop(STDOUT_FILENO, dst.start, dst.ptr - dst.start);
 
-	free(dst);
+	buffer_free(&dst);
 
 	return 0;
 }
