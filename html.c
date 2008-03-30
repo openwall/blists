@@ -7,38 +7,8 @@
 
 #include "params.h"
 #include "index.h"
+#include "buffer.h"
 #include "misc.h"
-
-struct buffer {
-	char *start, *end, *ptr;
-};
-
-static int buffer_alloc(struct buffer *dst, size_t size)
-{
-	if (!size || !(dst->start = malloc(size))) return -1;
-	dst->end = dst->start + size;
-	dst->ptr = dst->start;
-	return 0;
-}
-
-static void buffer_free(struct buffer *dst)
-{
-	free(dst->start);
-}
-
-static void buffer_append(struct buffer *dst, char *what, size_t length)
-{
-	if (length > dst->end - dst->ptr) return;
-
-	memcpy(dst->ptr, what, length);
-	dst->ptr += length;
-}
-
-static void buffer_appendc(struct buffer *dst, char what)
-{
-	if (dst->ptr >= dst->end) return;
-	*(dst->ptr++) = what;
-}
 
 static void buffer_append_html(struct buffer *dst, char *what, size_t length)
 {
@@ -51,18 +21,18 @@ static void buffer_append_html(struct buffer *dst, char *what, size_t length)
 	while (ptr < end) {
 		switch ((c = (unsigned char)*ptr++)) {
 		case '<':
-			buffer_append(dst, "&lt;", 4);
+			buffer_appends(dst, "&lt;");
 			break;
 		case '>':
-			buffer_append(dst, "&gt;", 4);
+			buffer_appends(dst, "&gt;");
 			break;
 		case '&':
-			buffer_append(dst, "&amp;", 5);
+			buffer_appends(dst, "&amp;");
 			break;
 		case '@':
 			if (ptr - 1 > what && ptr + 3 < end &&
 			    *(ptr - 2) >= ' ' && *ptr >= ' ') {
-				buffer_append(dst, "@...", 4);
+				buffer_appends(dst, "@...");
 				ptr += 3;
 				break;
 			}
@@ -232,11 +202,11 @@ int html_message(char *list,
 	trunc = size > MAX_MESSAGE_SIZE;
 	if (trunc)
 		size = MAX_MESSAGE_SIZE_TRUNC;
-	if (size < 10 || buffer_alloc(&src, size)) {
+	if (buffer_init(&src, size)) {
 		free(list_file);
 		return html_error(NULL);
 	}
-	if (buffer_alloc(&dst, size * 10 + 1500)) { /* XXX */
+	if (buffer_init(&dst, size)) {
 		buffer_free(&src);
 		free(list_file);
 		return html_error(NULL);
@@ -258,24 +228,20 @@ int html_message(char *list,
 		return html_error(NULL);
 	}
 
-	buffer_append(&dst, "\n\n", 2);
-	if (prev) {
-		snprintf(dst.ptr, 250, /* XXX */
+	buffer_appends(&dst, "\n\n");
+	if (prev)
+		buffer_appendf(&dst,
 		    "<a href=\"../../../%u/%02u/%02u/%u\">[&lt;prev]</a>",
 		    MIN_YEAR + idx_msg[0].y, idx_msg[0].m, idx_msg[0].d, n0);
-		dst.ptr += strlen(dst.ptr);
-	}
-	if (next) {
-		snprintf(dst.ptr, 250, /* XXX */
+	if (next)
+		buffer_appendf(&dst,
 		    "%s<a href=\"../../../%u/%02u/%02u/%u\">[next&gt;]</a>",
 		    prev ? " " : "",
 		    MIN_YEAR + idx_msg[2].y, idx_msg[2].m, idx_msg[2].d, n2);
-		dst.ptr += strlen(dst.ptr);
-	}
 
 	if (prev || next)
 		buffer_appendc(&dst, ' ');
-	buffer_append(&dst, "<a href=\"..\">[month]</a>", 24);
+	buffer_appends(&dst, "<a href=\"..\">[month]</a>");
 
 	date = from = to = subject = body = NULL;
 	seen_nl = 1;
@@ -323,7 +289,7 @@ int html_message(char *list,
 	if (src.ptr > src.start)
 		*(src.ptr - 1) = '\0';
 
-	buffer_append(&dst, "\n<pre>\n", 7);
+	buffer_appends(&dst, "\n<pre>\n");
 	if (date)
 		buffer_append_header(&dst, date);
 	if (from)
@@ -336,12 +302,17 @@ int html_message(char *list,
 		buffer_appendc(&dst, '\n');
 		buffer_append_html(&dst, body, src.end - body);
 	}
-	buffer_append(&dst, "</pre>\n", 7);
+	buffer_appends(&dst, "</pre>\n");
 
 	buffer_free(&src);
 
 	if (trunc)
-		buffer_append(&dst, "[ TRUNCATED ]<br>\n", 18);
+		buffer_appends(&dst, "[ TRUNCATED ]<br>\n");
+
+	if (dst.error) {
+		buffer_free(&dst);
+		return html_error(NULL);
+	}
 
 	write_loop(STDOUT_FILENO, dst.start, dst.ptr - dst.start);
 
@@ -383,13 +354,12 @@ int html_index(char *list, unsigned int y, unsigned int m)
 	if (close(fd) || error)
 		return html_error(NULL);
 
-	if (buffer_alloc(&dst, 1000000)) /* XXX */
+	if (buffer_init(&dst, 0))
 		return html_error(NULL);
 
-	buffer_append(&dst, "\n\n", 2);
+	buffer_appends(&dst, "\n\n");
 
-	sprintf(dst.ptr, "<p><h2>%04u/%02u\n</h2><p>", y, m);
-	dst.ptr += strlen(dst.ptr); /* XXX */
+	buffer_appendf(&dst, "<p><h2>%04u/%02u\n</h2><p>", y, m);
 
 	total = 0;
 	dp = 0;
@@ -407,26 +377,27 @@ int html_index(char *list, unsigned int y, unsigned int m)
 			}
 			total += count;
 			if (count > 999) count = 999;
-			sprintf(dst.ptr, "<b>%u</b>:", dp + 1);
-			dst.ptr += strlen(dst.ptr); /* XXX */
-			for (n = 1; n <= count; n++) {
-				snprintf(dst.ptr, 250,
+			buffer_appendf(&dst, "<b>%u</b>:", dp + 1);
+			for (n = 1; n <= count; n++)
+				buffer_appendf(&dst,
 				    " <a href=\"%02u/%u\">%u</a>",
 				    dp + 1, n, n);
-				dst.ptr += strlen(dst.ptr); /* XXX */
-			}
-			buffer_append(&dst, "<br>\n", 5);
+			buffer_appends(&dst, "<br>\n");
 		}
 		mp = mn[d];
 		dp = d;
 	}
 
-	if (total) {
-		sprintf(dst.ptr, "<p>%u message%s\n",
+	if (total)
+		buffer_appendf(&dst, "<p>%u message%s\n",
 		    total, total == 1 ? "" : "s");
-		dst.ptr += strlen(dst.ptr); /* XXX */
-	} else
-		buffer_append(&dst, "No messages\n", 12);
+	else
+		buffer_appends(&dst, "No messages\n");
+
+	if (dst.error) {
+		buffer_free(&dst);
+		return html_error(NULL);
+	}
 
 	write_loop(STDOUT_FILENO, dst.start, dst.ptr - dst.start);
 
