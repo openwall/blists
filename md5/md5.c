@@ -24,8 +24,9 @@
 /*
  * The basic MD5 functions.
  *
- * F is optimized compared to its RFC 1321 definition just like in Colin
- * Plumb's implementation.
+ * F and G are optimized compared to their RFC 1321 definitions for
+ * architectures that lack an AND-NOT instruction, just like in Colin Plumb's
+ * implementation.
  */
 #define F(x, y, z)			((z) ^ ((x) & ((y) ^ (z))))
 #define G(x, y, z)			((y) ^ ((z) & ((x) ^ (y))))
