@@ -36,7 +36,52 @@ static void buffer_append(struct buffer *dst, char *what, size_t length)
 static void buffer_appendc(struct buffer *dst, char what)
 {
 	if (dst->ptr >= dst->end) return;
-	*(dst->ptr) = what;
+	*(dst->ptr++) = what;
+}
+
+static void buffer_append_html(struct buffer *dst, char *what, size_t length)
+{
+	char *ptr, *end;
+	unsigned char c;
+
+	ptr = what;
+	end = what + length;
+
+	while (ptr < end) {
+		switch ((c = (unsigned char)*ptr++)) {
+		case '<':
+			buffer_append(dst, "&lt;", 4);
+			break;
+		case '>':
+			buffer_append(dst, "&gt;", 4);
+			break;
+		case '&':
+			buffer_append(dst, "&amp;", 5);
+			break;
+		case '@':
+			if (ptr - 1 > what && ptr + 3 < end &&
+			    *(ptr - 2) >= ' ' && *ptr >= ' ') {
+				buffer_append(dst, "@...", 4);
+				ptr += 3;
+				break;
+			}
+		case '\n':
+		case '\t':
+			buffer_appendc(dst, c);
+			break;
+		default:
+			if ((c >= 0x20 && c <= 0x7e) || c >= 0xa0)
+				buffer_appendc(dst, c);
+			else
+				buffer_appendc(dst, '.');
+		}
+	}
+}
+
+static void buffer_append_header(struct buffer *dst, char *what)
+{
+	buffer_append_html(dst, what, strlen(what));
+	buffer_appendc(dst, '\n');
 }
 
 /*
@@ -79,13 +124,14 @@ int html_message(char *list,
 	unsigned int aday;
 	char *list_file, *idx_file;
 	off_t idx_offset;
-	int fd, error, got, trunc, prev, next, header;
+	int fd, error, got, trunc, prev, next, seen_nl;
 	idx_msgnum_t m0, m1, m1r, n0, n2;
 	struct idx_message idx_msg[3];
 	idx_off_t offset;
 	idx_size_t size;
 	struct buffer src, dst;
 	unsigned char c;
+	char *date, *from, *to, *subject;
 
 	if (y < MIN_YEAR || y > MAX_YEAR ||
 	    m < 1 || m > 12 ||
@@ -179,7 +225,7 @@ int html_message(char *list,
 	trunc = size > MAX_MESSAGE_SIZE;
 	if (trunc)
 		size = MAX_MESSAGE_SIZE_TRUNC;
-	if (buffer_alloc(&src, size)) {
+	if (size < 10 || buffer_alloc(&src, size)) {
 		free(list_file);
 		return html_error(NULL);
 	}
@@ -220,53 +266,64 @@ int html_message(char *list,
 		    MIN_YEAR + idx_msg[2].y, idx_msg[2].m, idx_msg[2].d, n2);
 		dst.ptr += strlen(dst.ptr);
 	}
-	buffer_append(&dst, "\n<pre>\n", 7);
 
-	header = 1;
+	date = from = to = subject = NULL;
+	seen_nl = 1;
+	while (src.ptr < src.end - 9) {
+		c = (unsigned char)*src.ptr++;
 
-	while (src.ptr <= src.end) {
-		switch ((c = (unsigned char)*src.ptr++)) {
-		case '<':
-			if (header != 2) buffer_append(&dst, "&lt;", 4);
+		if (seen_nl)
+		switch (c) {
+		case 'D':
+		case 'd':
+			if (!strncasecmp(src.ptr, "ate:", 4))
+				date = src.ptr - 1;
 			break;
-		case '>':
-			if (header != 2) buffer_append(&dst, "&gt;", 4);
+		case 'F':
+		case 'f':
+			if (!strncasecmp(src.ptr, "rom:", 4))
+				from = src.ptr - 1;
 			break;
-		case '&':
-			if (header != 2) buffer_append(&dst, "&amp;", 5);
+		case 'T':
+		case 't':
+			if (!strncasecmp(src.ptr, "o:", 2))
+				to = src.ptr - 1;
 			break;
-		case '\n':
-			if (header == 2) {
-				if (*src.ptr == '\t') break;
-				header = 1;
-			} else
-				buffer_appendc(&dst, c);
-			if (!header) break;
-			if (*src.ptr == '\n') {
-				header = 0;
-				break;
-			}
-			if (!strncasecmp(src.ptr, "From:", 5)) break;
-			if (!strncasecmp(src.ptr, "To:", 3)) break;
-			if (!strncasecmp(src.ptr, "Date:", 5)) break;
-			if (!strncasecmp(src.ptr, "Subject:", 8)) break;
-			header = 2;
+		case 'S':
+		case 's':
+			if (!strncasecmp(src.ptr, "ubject:", 2))
+				subject = src.ptr - 1;
 			break;
-		case '\t':
-			if (header != 2) buffer_appendc(&dst, c);
-			break;
-		default:
-			if (header == 2) break;
-			if ((c >= 0x20 && c <= 0x7e) || c >= 0xa0)
-				buffer_appendc(&dst, c);
-			else
-				buffer_appendc(&dst, '.');
 		}
+
+		if (seen_nl && c != '\t' && src.ptr > src.start + 1)
+			*(src.ptr - 2) = '\0';
+
+		if (c == '\n') {
+			if (seen_nl) break;
+			seen_nl = 1;
+			continue;
+		}
+
+		seen_nl = 0;
 	}
+	if (src.ptr > src.start)
+		*(src.ptr - 1) = '\0';
+
+	buffer_append(&dst, "\n<pre>\n", 7);
+	if (date)
+		buffer_append_header(&dst, date);
+	if (from)
+		buffer_append_header(&dst, from);
+	if (to)
+		buffer_append_header(&dst, to);
+	if (subject)
+		buffer_append_header(&dst, subject);
+	buffer_appendc(&dst, '\n');
+	buffer_append_html(&dst, src.ptr, src.end - src.ptr);
+	buffer_append(&dst, "</pre>\n", 7);
 
 	buffer_free(&src);
-
-	buffer_append(&dst, "</pre>\n", 7);
 
 	if (trunc)
 		buffer_append(&dst, "[ TRUNCATED ]<br>\n", 18);
