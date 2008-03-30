@@ -50,7 +50,7 @@ int html_message(char *list,
 	char *src, *dst, *sptr, *dptr;
 	unsigned char c;
 	off_t idx_offset;
-	int fd, error, got, trunc, prev, next;
+	int fd, error, got, trunc, prev, next, header;
 	idx_msgnum_t m0, m1, m1r, n0, n2;
 	struct idx_message idx_msg[3];
 	idx_off_t offset;
@@ -196,28 +196,53 @@ int html_message(char *list,
 	memcpy(dptr, "\n<pre>\n", 7);
 	dptr += 7;
 
+	header = 1;
+
 	sptr = src;
 	while (sptr < src + size_src) {
 		if (dptr > dst + size_dst - 500) break; /* XXX */
 
 		switch ((c = (unsigned char)*sptr++)) {
 		case '<':
-			memcpy(dptr, "&lt;", 4);
-			dptr += 4;
+			if (header != 2) {
+				memcpy(dptr, "&lt;", 4);
+				dptr += 4;
+			}
 			break;
 		case '>':
-			memcpy(dptr, "&gt;", 4);
-			dptr += 4;
+			if (header != 2) {
+				memcpy(dptr, "&gt;", 4);
+				dptr += 4;
+			}
 			break;
 		case '&':
-			memcpy(dptr, "&amp;", 5);
-			dptr += 5;
+			if (header != 2) {
+				memcpy(dptr, "&amp;", 5);
+				dptr += 5;
+			}
+			break;
+		case '\n':
+			if (header == 2) {
+				if (*sptr == '\t') break;
+				header = 1;
+			} else
+				*dptr++ = c;
+			if (!header) break;
+			if (*sptr == '\n') {
+				header = 0;
+				break;
+			}
+			if (!strncasecmp(sptr, "From:", 5)) break;
+			if (!strncasecmp(sptr, "To:", 3)) break;
+			if (!strncasecmp(sptr, "Date:", 5)) break;
+			if (!strncasecmp(sptr, "Subject:", 8)) break;
+			header = 2;
 			break;
 		case '\t':
-		case '\n':
-			*dptr++ = c;
+			if (header != 2) *dptr++ = c;
 			break;
 		default:
+			if (header == 2) break;
 			if ((c >= 0x20 && c <= 0x7e) || c >= 0xa0)
 				*dptr++ = c;
 			else
