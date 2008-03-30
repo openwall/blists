@@ -341,37 +341,29 @@ int html_message(char *list,
 			buffer_append_header(&dst, to);
 		if (subject)
 			buffer_append_header(&dst, subject);
-		if (mime.entities && mime.entities->boundary) {
-			mime_next_body_part(&mime);
-			do {
+		do {
+			if (mime.entities->boundary) {
+				body = mime_next_body_part(&mime);
+				if (!body || body >= src.end) break;
 				body = mime_next_body(&mime);
-				if (mime.entities->boundary)
-					body = NULL;
-				else
-				if (strncasecmp(mime.entities->type,
-				    "text/", 5) ||
-				    !strcasecmp(mime.entities->type,
-				    "text/html")) {
-					buffer_appends(&dst,
-					    "\n[ CONTENT OF TYPE ");
-					buffer_append_html(&dst,
-					    mime.entities->type,
-					    strlen(mime.entities->type));
-					buffer_appends(&dst, " SKIPPED ]\n\n");
-					body = NULL;
-				}
-				bend = mime_next_body_part(&mime);
-				if (body) {
-					buffer_appendc(&dst, '\n');
-					buffer_append_html(&dst,
-					    body, bend - body);
-				}
-			} while (bend < src.end);
-		} else
-		if (body) {
+			}
+			if (mime.entities->boundary)
+				body = NULL;
+			else
+			if (strncasecmp(mime.entities->type, "text/", 5) ||
+			    !strcasecmp(mime.entities->type, "text/html")) {
+				buffer_appends(&dst, "\n[ CONTENT OF TYPE ");
+				buffer_append_html(&dst, mime.entities->type,
+				    strlen(mime.entities->type));
+				buffer_appends(&dst, " SKIPPED ]\n");
+				body = NULL;
+			}
+			bend = mime_end_body_part(&mime);
+			if (!bend) break;
+			if (!body) continue;
 			buffer_appendc(&dst, '\n');
-			buffer_append_html(&dst, body, src.end - body);
-		}
+			buffer_append_html(&dst, body, bend - body);
+		} while (bend < src.end && mime.entities);
 		buffer_appends(&dst, "</pre>\n");
 
 		if (trunc)

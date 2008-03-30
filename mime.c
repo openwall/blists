@@ -4,12 +4,37 @@
 #include "buffer.h"
 #include "mime.h"
 
+static int new_entity(struct mime_ctx *ctx)
+{
+	struct mime_entity *entity;
+
+	if (ctx->depth >= MIME_DEPTH_MAX ||
+	    !(entity = malloc(sizeof(*entity))))
+		return ctx->dst.error = -1;
+
+	entity->next = ctx->entities;
+	entity->type = "text/plain";
+	entity->boundary = NULL;
+	ctx->entities = entity;
+	ctx->depth++;
+
+	return 0;
+}
+
 int mime_init(struct mime_ctx *ctx, struct buffer *src)
 {
-	ctx->src = src;
 	ctx->entities = NULL;
 	ctx->depth = 0;
-	return buffer_init(&ctx->dst, src->end - src->ptr);
+	ctx->src = src;
+
+	if (buffer_init(&ctx->dst, src->end - src->ptr)) return -1;
+
+	if (new_entity(ctx)) {
+		buffer_free(&ctx->dst);
+		return -1;
+	}
+
+	return 0;
 }
 
 static void free_entities_to(struct mime_ctx *ctx, struct mime_entity *end)
@@ -68,17 +93,8 @@ static void mime_process_header(struct mime_ctx *ctx, char *header)
 
 	if (strncasecmp(header, "Content-Type:", 13)) return;
 
-	/* XXX: allocate new entities as boundaries are seen, not here */
-	if (ctx->depth >= MIME_DEPTH_MAX ||
-	    !(entity = malloc(sizeof(*entity)))) {
-		ctx->dst.error = -1;
-		return;
-	}
-
-	entity->next = ctx->entities;
+	entity = ctx->entities;
 	entity->boundary = NULL;
-	ctx->entities = entity;
-	ctx->depth++;
 
 	p = header + 13;
 	while (*p == ' ' || *p == '\t' || *p == '\n') p++;
@@ -140,22 +156,18 @@ char *mime_decode_header(struct mime_ctx *ctx)
 	return dst_header;
 }
 
-char *mime_next_body_part(struct mime_ctx *ctx)
+static char *find_next_boundary(struct mime_ctx *ctx, int pre)
 {
 	struct mime_entity *entity;
 	char *p, *end;
 	size_t length;
 
-/* Forget the last non-multipart content type processed */
-	if (ctx->entities && !ctx->entities->boundary)
-		free_entities_to(ctx, ctx->entities->next);
+	end = ctx->src->end;
 
-/* If the current body part is not multipart, we have nothing to do */
-	if (!ctx->entities || !ctx->entities->boundary)
-		return ctx->src->ptr;
+	if (!ctx->entities)
+		return end;
 
 	p = ctx->src->ptr;
-	end = ctx->src->end;
 	do {
 		if (end - p < 3)
 			break;
@@ -163,22 +175,41 @@ char *mime_next_body_part(struct mime_ctx *ctx)
 			p += 2;
 			entity = ctx->entities;
 			do {
-				if (!entity->boundary) continue;
-				length = strlen(entity->boundary);
-				if (length <= end - p &&
-				    !memcmp(p, entity->boundary, length)) {
-					free_entities_to(ctx, entity);
-					return ctx->src->ptr = p - 2;
+/* We must have been called for multipart entities only */
+				if (!entity->boundary) {
+					ctx->dst.error = -1;
+					return NULL;
 				}
+				length = strlen(entity->boundary);
+				if (length > end - p ||
+				    memcmp(p, entity->boundary, length))
+					continue;
+				if (length + 2 <= end - p &&
+				    p[length] == '-' && p[length + 1] == '-') {
+					free_entities_to(ctx, entity->next);
+					if (pre)
+						return ctx->src->ptr = p - 2;
+					if (ctx->entities) break;
+					return end;
+				}
+				free_entities_to(ctx, entity);
+				if (!pre && new_entity(ctx)) return NULL;
+				p -= 2;
+				if (pre && p > ctx->src->ptr) p--;
+				return ctx->src->ptr = p;
 			} while ((entity = entity->next));
 		}
 		p = memchr(p, '\n', end - p);
-		if (!p)
-			break;
+		if (!p) break;
 		p++;
 	} while (1);
 
 	return end;
+}
+
+char *mime_next_body_part(struct mime_ctx *ctx)
+{
+	return find_next_boundary(ctx, 0);
 }
 
 char *mime_next_body(struct mime_ctx *ctx)
@@ -196,4 +227,13 @@ char *mime_next_body(struct mime_ctx *ctx)
 	}
 
 	return ctx->src->ptr;
+}
+
+char *mime_end_body_part(struct mime_ctx *ctx)
+{
+/* Forget the last non-multipart content type processed */
+	if (!ctx->entities->boundary)
+		free_entities_to(ctx, ctx->entities->next);
+
+	return find_next_boundary(ctx, 1);
 }

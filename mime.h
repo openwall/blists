@@ -28,5 +28,6 @@ extern char *mime_decode_header(struct mime_ctx *ctx);
 
 extern char *mime_next_body_part(struct mime_ctx *ctx);
 extern char *mime_next_body(struct mime_ctx *ctx);
+extern char *mime_end_body_part(struct mime_ctx *ctx);
 
 #endif
