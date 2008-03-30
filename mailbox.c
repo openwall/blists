@@ -100,15 +100,13 @@ static int message_process(struct parsed_message *msg)
 		idx_msg->flags |= IDX_F_HAVE_IRT;
 	}
 
-	idx_msg->t.alast = -1;
-
 	return 0;
 }
 
 static int msgs_link(void)
 {
 	idx_msgnum_t i;
-	struct idx_message *m, *tl;
+	struct idx_message *m, *lit;
 	unsigned int aday;
 	struct mem_message *pool, **hash, *irt;
 	unsigned int hv;
@@ -141,53 +139,24 @@ static int msgs_link(void)
 		}
 		if (!irt) continue;
 
-		if (irt->msg->t.alast < 0) {
-			aday =
-			    ((unsigned int)m->y * 12 +
-			    ((unsigned int)m->m - 1)) * 31 +
-			    ((unsigned int)m->d - 1);
-			irt->msg->t.alast = m->t.alast = i;
-			irt->msg->t.ny = m->y;
-			irt->msg->t.nm = m->m;
-			irt->msg->t.nd = m->d;
-			irt->msg->t.nn = i + 2 - num_by_aday[aday];
-			aday =
-			    ((unsigned int)irt->msg->y * 12 +
-			    ((unsigned int)irt->msg->m - 1)) * 31 +
-			    ((unsigned int)irt->msg->d - 1);
-			m->t.py = irt->msg->y;
-			m->t.pm = irt->msg->m;
-			m->t.pd = irt->msg->d;
-			m->t.pn = irt - pool + 2 - num_by_aday[aday];
-		} else {
-			tl = &msgs[irt->msg->t.alast];
-			aday =
-			    ((unsigned int)tl->y * 12 +
-			    ((unsigned int)tl->m - 1)) * 31 +
-			    ((unsigned int)tl->d - 1);
-			m->t.py = tl->y;
-			m->t.pm = tl->m;
-			m->t.pd = tl->d;
-			m->t.pn = irt->msg->t.alast + 2 - num_by_aday[aday];
-			aday =
-			    ((unsigned int)m->y * 12 +
-			    ((unsigned int)m->m - 1)) * 31 +
-			    ((unsigned int)m->d - 1);
-			tl->t.ny = m->y;
-			tl->t.nm = m->m;
-			tl->t.nd = m->d;
-			tl->t.nn = i + 2 - num_by_aday[aday];
-			tl->t.alast = i;
-			irt->msg->t.alast = i;
-			while (tl->t.pn) {
-				aday =
-				    ((unsigned int)tl->t.py * 12 +
-				    ((unsigned int)tl->t.pm - 1)) * 31 +
-				    ((unsigned int)tl->t.pd - 1);
-				tl = &msgs[num_by_aday[aday] + tl->t.pn - 2];
-				tl->t.alast = i;
-			}
+/* The following loop could be avoided by maintaining a thread index,
+ * including a "last in thread" pointer for each thread, and pointers
+ * from each message into the thread index. */
+		lit = irt->msg;
+		while (lit->t.nn) {
+			aday = YMD2ADAY(lit->t.ny, lit->t.nm, lit->t.nd);
+			lit = &msgs[num_by_aday[aday] + lit->t.nn - 2];
 		}
+		aday = YMD2ADAY(lit->y, lit->m, lit->d);
+		m->t.py = lit->y;
+		m->t.pm = lit->m;
+		m->t.pd = lit->d;
+		m->t.pn = lit - msgs + 2 - num_by_aday[aday];
+		aday = YMD2ADAY(m->y, m->m, m->d);
+		lit->t.ny = m->y;
+		lit->t.nm = m->m;
+		lit->t.nd = m->d;
+		lit->t.nn = i + 2 - num_by_aday[aday];
 	}
 
 	free(hash);
@@ -216,10 +185,7 @@ retry:
 
 	prev_aday = 0;
 	for (i = 0, m = msgs; i < msg_num; i++, m++) {
-		aday =
-		    ((unsigned int)m->y * 12 +
-		    ((unsigned int)m->m - 1)) * 31 +
-		    ((unsigned int)m->d - 1);
+		aday = YMD2ADAY(m->y, m->m, m->d);
 
 		if (aday < prev_aday) {
 			fprintf(stderr, "Warning: date went backwards: "
@@ -460,6 +426,26 @@ static int mailbox_parse_fd(int fd)
 					MD5_Final(msg.irt_hash, &hash);
 					msg.have_irt = 1;
 				}
+			}
+			break;
+		case 'R':
+		case 'r':
+			if (!msg.have_irt &&
+			    eq(line, length, "References:", 11)) {
+				char *p = &line[11], *q, *e = line + length;
+				while (p < e && *p != '<') p++;
+				if (p >= e) break;
+				do {
+					q = ++p;
+					while (p < e && *p != '<') p++;
+				} while (p < e);
+				p = q;
+				while (q < e && *q != '>') q++;
+				if (q >= e || q - p < 4) break;
+				MD5_Init(&hash);
+				MD5_Update(&hash, p, q - p);
+				MD5_Final(msg.irt_hash, &hash);
+				msg.have_irt = 1;
 			}
 			break;
 		}

@@ -122,7 +122,7 @@ int html_message(char *list,
 	    d < 1 || d > 31 ||
 	    n < 1 || n > 999999)
 		return html_error("Invalid date or message number");
-	aday = ((y - MIN_YEAR) * 12 + (m - 1)) * 31 + (d - 1);
+	aday = YMD2ADAY(y - MIN_YEAR, m, d);
 
 	list_file = concat(MAIL_SPOOL_PATH "/", list, NULL);
 	if (!list_file) return html_error(NULL);
@@ -180,10 +180,7 @@ int html_message(char *list,
 
 	n0 = n - 1;
 	if (!n0 && prev && !error) {
-		aday =
-		    ((unsigned int)idx_msg[0].y * 12 +
-		    ((unsigned int)idx_msg[0].m - 1)) * 31 +
-		    ((unsigned int)idx_msg[0].d - 1);
+		aday = YMD2ADAY(idx_msg[0].y, idx_msg[0].m, idx_msg[0].d);
 		idx_offset = aday * sizeof(m0);
 		error =
 		    lseek(fd, idx_offset, SEEK_SET) != idx_offset ||
@@ -342,7 +339,7 @@ int html_message(char *list,
 				buffer_appendf(&dst, "../../../%u/%02u/%02u/",
 				    MIN_YEAR + idx_msg[1].t.ny,
 				    idx_msg[1].t.nm, idx_msg[1].t.nd);
-			buffer_appendf(&dst, "%u\">[&lt;thread-next]</a> ",
+			buffer_appendf(&dst, "%u\">[thread-next&gt;]</a> ",
 			    idx_msg[1].t.nn);
 		}
 		buffer_appends(&dst,

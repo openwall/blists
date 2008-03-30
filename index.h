@@ -5,9 +5,15 @@
 
 #include "params.h"
 
-#define N_ADAY ((MAX_YEAR - MIN_YEAR + 1) * 12 * 31)
-#define IDX_F_HAVE_MSGID 1
-#define IDX_F_HAVE_IRT 2
+#define N_ADAY \
+	((MAX_YEAR - MIN_YEAR + 1) * 12 * 31)
+#define YMD2ADAY(y, m, d) \
+	(((unsigned int)(y) * 12 + \
+	((unsigned int)(m) - 1)) * 31 + \
+	((unsigned int)(d) - 1))
+
+#define IDX_F_HAVE_MSGID		1
+#define IDX_F_HAVE_IRT			2
 
 typedef int idx_msgnum_t;
 typedef off_t idx_off_t;
@@ -21,7 +27,6 @@ struct idx_message {
 	idx_size_t size;
 	idx_hash_t msgid_hash, irt_hash;
 	struct {
-		idx_msgnum_t alast;
 		idx_msgnum_t pn, nn;
 		idx_ymd_t py, pm, pd, ny, nm, nd;
 	} t;

@@ -49,6 +49,6 @@
  * this length.  Keep this at least as large as the longest header line
  * that we need to parse, but not too large for performance reasons.
  */
-#define LINE_BUFFER_SIZE		0x100
+#define LINE_BUFFER_SIZE		0x1000
 
 #endif
