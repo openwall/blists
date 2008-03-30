@@ -129,6 +129,7 @@ int html_message(char *list,
 
 	idx_offset = aday * sizeof(idx_msgnum_t);
 	error =
+	    lock_fd(fd, 1) ||
 	    lseek(fd, idx_offset, SEEK_SET) != idx_offset ||
 	    read_loop(fd, (char *)&m1, sizeof(m1)) != sizeof(m1);
 	if (error || m1 < 1 || m1 >= MAX_MAILBOX_MESSAGES) {
@@ -178,6 +179,8 @@ int html_message(char *list,
 		else
 			error = 1;
 	}
+
+	if (unlock_fd(fd)) error = 1;
 
 	if (close(fd) || error) {
 		free(list_file);
@@ -299,7 +302,7 @@ int html_message(char *list,
 	if (src.ptr > src.start)
 		*(src.ptr - 1) = '\0';
 
-	buffer_appends(&dst, "<pre>\n");
+	buffer_appends(&dst, "<pre style=\"white-space: pre-wrap\">\n");
 	if (date)
 		buffer_append_header(&dst, date);
 	if (from)
@@ -359,8 +362,10 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 
 	idx_offset = aday * sizeof(idx_msgnum_t);
 	error =
+	    lock_fd(fd, 1) ||
 	    lseek(fd, idx_offset, SEEK_SET) != idx_offset ||
 	    read_loop(fd, (char *)mn, sizeof(mn)) != sizeof(mn);
+	if (unlock_fd(fd)) error = 1;
 	if (close(fd) || error || buffer_init(&dst, 0))
 		return html_error(NULL);
 
@@ -458,8 +463,10 @@ int html_year_index(char *list, unsigned int y)
 
 	idx_offset = aday * sizeof(idx_msgnum_t);
 	error =
+	    lock_fd(fd, 1) ||
 	    (idx_offset && lseek(fd, idx_offset, SEEK_SET) != idx_offset) ||
 	    read_loop(fd, (char *)mn, mn_size) != mn_size;
+	if (unlock_fd(fd)) error = 1;
 	if (close(fd) || error || buffer_init(&dst, 0)) {
 		free(mn);
 		return html_error(NULL);

@@ -3,6 +3,7 @@
  */
 
 #define _XOPEN_SOURCE
+#define _XOPEN_SOURCE_EXTENDED
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -302,19 +303,20 @@ int mailbox_parse(char *mailbox)
 {
 	int fd;
 	char *idx;
+	off_t idx_size;
 	int error;
 	unsigned int aday;
 
 	fd = open(mailbox, O_RDONLY);
 	if (fd < 0) return 1;
 
+	idx_fd = -1;
 	idx = concat(mailbox, INDEX_FILENAME_SUFFIX, NULL);
-	error = !idx;
 	if (idx) {
-		idx_fd = open(idx, O_CREAT | O_WRONLY | O_TRUNC, 0644);
-		if (idx_fd < 0) error = 1;
+		idx_fd = open(idx, O_CREAT | O_WRONLY, 0644);
 		free(idx);
 	}
+	error = idx_fd < 0;
 
 	msg_num = 0;
 	prev_aday = 0;
@@ -322,12 +324,25 @@ int mailbox_parse(char *mailbox)
 	memset(cnt_by_aday, 0, sizeof(cnt_by_aday));
 
 	if (!error)
-		error =
-		    write_loop(idx_fd, (char *)num_by_aday, sizeof(num_by_aday))
-		    != sizeof(num_by_aday);
-
-	if (!error)
 		error = lock_fd(fd, 1);
+	if (!error)
+		error = lock_fd(idx_fd, 0);
+
+	if (!error) {
+		idx_size = lseek(idx_fd, 0, SEEK_END);
+		if (idx_size >= sizeof(num_by_aday)) {
+			error =
+			    lseek(idx_fd, sizeof(num_by_aday), SEEK_SET)
+				!= sizeof(num_by_aday);
+		} else {
+			/* Avoid making the file sparse and later fragmented */
+			error =
+			    lseek(idx_fd, 0, SEEK_SET) != 0 ||
+			    write_loop(idx_fd, (char *)num_by_aday,
+				sizeof(num_by_aday)) != sizeof(num_by_aday);
+		}
+	}
+
 	if (!error) {
 		error = mailbox_parse_fd(fd);
 		if (unlock_fd(fd) && !error) error = 1;
@@ -335,8 +350,10 @@ int mailbox_parse(char *mailbox)
 
 	if (close(fd) && !error) error = 1;
 
-	if (!error)
-		error = lseek(idx_fd, 0, SEEK_SET) != 0;
+	if (!error) {
+		idx_size = lseek(idx_fd, 0, SEEK_CUR);
+		error = idx_size == -1 || lseek(idx_fd, 0, SEEK_SET) != 0;
+	}
 
 	if (!error) {
 		for (aday = 1; aday <= N_ADAY; aday++)
@@ -345,6 +362,14 @@ int mailbox_parse(char *mailbox)
 		error =
 		    write_loop(idx_fd, (char *)num_by_aday, sizeof(num_by_aday))
 		    != sizeof(num_by_aday);
+	}
+
+	if (!error)
+		error = ftruncate(idx_fd, idx_size) != 0;
+
+	if (idx_fd >= 0) {
+		if (unlock_fd(idx_fd) && !error) error = 1;
+		if (close(idx_fd) && !error) error = 1;
 	}
 
 	return error;
