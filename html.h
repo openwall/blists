@@ -1,6 +1,12 @@
 #ifndef _BLISTS_HTML_H
 #define _BLISTS_HTML_H
 
+#define HTML_HEADER			1
+#define HTML_BODY			2
+
+/* Header vs. body */
+extern int html_flags;
+
 /*
  * Outputs an HTML error message to stdout.  If msg is NULL, then the
  * error is assumed to be internal to the server and a fixed message is

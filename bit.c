@@ -4,10 +4,21 @@
 
 #include "html.h"
 
-int main(void)
+int main(int argc, char **argv)
 {
 	char *list, *p, nul, slash;
 	unsigned int y, m, d, n;
+
+	if (argc < 1 || argc > 2) return html_error(NULL);
+
+	if (argc == 2) {
+		if (!strcmp(argv[1], "header"))
+			html_flags = HTML_HEADER;
+		else if (!strcmp(argv[1], "body"))
+			html_flags = HTML_BODY;
+		else
+			return html_error(NULL);
+	}
 
 	p = getenv("SERVER_PROTOCOL");
 	if (!p || strcmp(p, "INCLUDED")) return html_error(NULL);
@@ -18,6 +29,7 @@ int main(void)
 	for (p = list; *p; p++) {
 		if (p - list > 99) goto bad_syntax;
 		if (*p >= 'a' && *p <= 'z') continue;
+		if (*p >= '0' && *p <= '9') continue;
 		if (p != list && *p == '-') continue;
 		if (*p == '/') break;
 		goto bad_syntax;

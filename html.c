@@ -9,6 +9,9 @@
 #include "index.h"
 #include "buffer.h"
 #include "misc.h"
+#include "html.h"
+
+int html_flags = HTML_BODY;
 
 static void buffer_append_html(struct buffer *dst, char *what, size_t length)
 {
@@ -82,7 +85,14 @@ int html_error(char *msg)
 	if (!msg)
 		msg = "Internal server error";
 
-	msg = concat("\n\n<p>The request has failed: ", msg, ".\n", NULL);
+	if (html_flags & HTML_HEADER)
+		msg = concat("\n\n<title>The request has failed: ", msg,
+		    "</title>\n"
+		    "<meta name=\"robots\" content=\"noindex\">\n", NULL);
+	else
+		msg = concat("\n\n<p>The request has failed: ", msg,
+		    ".\n", NULL);
+
 	write_loop(STDOUT_FILENO, msg, strlen(msg));
 	free(msg);
 
@@ -101,7 +111,7 @@ int html_message(char *list,
 	idx_off_t offset;
 	idx_size_t size;
 	struct buffer src, dst;
-	char c, *date, *from, *to, *subject, *body;
+	char c, *p, *q, *date, *from, *to, *subject, *body;
 
 	if (y < MIN_YEAR || y > MAX_YEAR ||
 	    m < 1 || m > 12 ||
@@ -230,32 +240,6 @@ int html_message(char *list,
 		return html_error(NULL);
 	}
 
-	buffer_appends(&dst, "\n\n");
-	if (prev) {
-		buffer_appends(&dst, "<a href=\"");
-		if (n == 1)
-			buffer_appendf(&dst, "../../../%u/%02u/%02u/",
-			    MIN_YEAR + idx_msg[0].y,
-			    idx_msg[0].m, idx_msg[0].d);
-		buffer_appendf(&dst, "%u\">[&lt;prev]</a>", n0);
-	}
-	if (next) {
-		if (prev)
-			buffer_appendc(&dst, ' ');
-		buffer_appends(&dst, "<a href=\"");
-		if (n2 == 1)
-			buffer_appendf(&dst, "../../../%u/%02u/%02u/",
-			    MIN_YEAR + idx_msg[2].y,
-			    idx_msg[2].m, idx_msg[2].d);
-		buffer_appendf(&dst, "%u\">[next&gt;]</a>", n2);
-	}
-	if (prev || next)
-		buffer_appendc(&dst, ' ');
-	buffer_appends(&dst,
-	    "<a href=\"..\">[month]</a>"
-	    " <a href=\"../..\">[year]</a>"
-	    " <a href=\"../../..\">[list]</a>\n");
-
 	date = from = to = subject = body = NULL;
 	seen_nl = 1;
 	while (src.ptr < src.end - 9) {
@@ -302,25 +286,75 @@ int html_message(char *list,
 	if (src.ptr > src.start)
 		*(src.ptr - 1) = '\0';
 
-	buffer_appends(&dst, "<pre style=\"white-space: pre-wrap\">\n");
-	if (date)
-		buffer_append_header(&dst, date);
-	if (from)
-		buffer_append_header(&dst, from);
-	if (to)
-		buffer_append_header(&dst, to);
-	if (subject)
-		buffer_append_header(&dst, subject);
-	if (body) {
-		buffer_appendc(&dst, '\n');
-		buffer_append_html(&dst, body, src.end - body);
+	if ((p = subject))
+	while ((p = strchr(p, '['))) {
+		if (strncmp(++p, list, strlen(list))) continue;
+		q = p + strlen(list);
+		if (*q != ']') continue;
+		if (*++q == ' ') q++;
+		memmove(--p, q, strlen(q) + 1);
 	}
-	buffer_appends(&dst, "</pre>\n");
+
+	buffer_appends(&dst, "\n\n");
+
+	if (html_flags & HTML_HEADER) {
+		buffer_appends(&dst, "<title>");
+		buffer_append_html(&dst, list, strlen(list));
+		if (subject && strlen(subject) > 9) {
+			buffer_appends(&dst, " - ");
+			buffer_append_html(&dst,
+			    subject + 9, strlen(subject + 9));
+		}
+		buffer_appends(&dst, "</title>\n");
+	}
+
+	if (html_flags & HTML_BODY) {
+		if (prev) {
+			buffer_appends(&dst, "<a href=\"");
+			if (n == 1)
+				buffer_appendf(&dst, "../../../%u/%02u/%02u/",
+				    MIN_YEAR + idx_msg[0].y,
+				    idx_msg[0].m, idx_msg[0].d);
+			buffer_appendf(&dst, "%u\">[&lt;prev]</a>", n0);
+		}
+		if (next) {
+			if (prev)
+				buffer_appendc(&dst, ' ');
+			buffer_appends(&dst, "<a href=\"");
+			if (n2 == 1)
+				buffer_appendf(&dst, "../../../%u/%02u/%02u/",
+				    MIN_YEAR + idx_msg[2].y,
+				    idx_msg[2].m, idx_msg[2].d);
+			buffer_appendf(&dst, "%u\">[next&gt;]</a>", n2);
+		}
+		if (prev || next)
+			buffer_appendc(&dst, ' ');
+		buffer_appends(&dst,
+		    "<a href=\"..\">[month]</a>"
+		    " <a href=\"../..\">[year]</a>"
+		    " <a href=\"../../..\">[list]</a>\n");
+
+		buffer_appends(&dst,
+		    "<pre style=\"white-space: pre-wrap\">\n");
+		if (date)
+			buffer_append_header(&dst, date);
+		if (from)
+			buffer_append_header(&dst, from);
+		if (to)
+			buffer_append_header(&dst, to);
+		if (subject)
+			buffer_append_header(&dst, subject);
+		if (body) {
+			buffer_appendc(&dst, '\n');
+			buffer_append_html(&dst, body, src.end - body);
+		}
+		buffer_appends(&dst, "</pre>\n");
+
+		if (trunc)
+			buffer_appends(&dst, "[ TRUNCATED ]<br>\n");
+	}
 
 	buffer_free(&src);
-
-	if (trunc)
-		buffer_appends(&dst, "[ TRUNCATED ]<br>\n");
 
 	if (dst.error) {
 		buffer_free(&dst);
@@ -369,45 +403,56 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 	if (close(fd) || error || buffer_init(&dst, 0))
 		return html_error(NULL);
 
-	buffer_appends(&dst,
-	    "\n\n"
-	    "<a href=\"..\">[year]</a>"
-	    " <a href=\"../..\">[list]</a>\n");
+	buffer_appends(&dst, "\n\n");
 
-	buffer_appendf(&dst, "<p><h2>%u/%02u</h2>\n<p>", y, m);
-
-	total = 0;
-	dp = 0;
-	mp = mn[0];
-	for (d = 1; d <= 31; d++) {
-		if (!mn[d]) continue;
-		if (mp > 0) {
-			if (mn[d] > 0)
-				count = mn[d] - mp;
-			else
-				count = -mn[d];
-			if (count <= 0) {
-				buffer_free(&dst);
-				return html_error(NULL);
-			}
-			total += count;
-			if (count > 999) count = 999;
-			buffer_appendf(&dst, "<b>%u</b>:", dp + 1);
-			for (n = 1; n <= count; n++)
-				buffer_appendf(&dst,
-				    " <a href=\"%02u/%u\">%u</a>",
-				    dp + 1, n, n);
-			buffer_appends(&dst, "<br>\n");
-		}
-		mp = mn[d];
-		dp = d;
+	if (html_flags & HTML_HEADER) {
+		buffer_appends(&dst, "<title>");
+		buffer_append_html(&dst, list, strlen(list));
+		buffer_appendf(&dst, " mailing list - %u/%02u</title>\n", y, m);
 	}
 
-	if (total)
-		buffer_appendf(&dst, "<p>%u message%s\n",
-		    total, total == 1 ? "" : "s");
-	else
-		buffer_appends(&dst, "No messages\n");
+	if (html_flags & HTML_BODY) {
+		buffer_appends(&dst,
+		    "<a href=\"..\">[year]</a>"
+		    " <a href=\"../..\">[list]</a>\n");
+
+		buffer_appends(&dst, "<p><h2>");
+		buffer_append_html(&dst, list, strlen(list));
+		buffer_appendf(&dst, " mailing list - %u/%02u</h2>\n<p>", y, m);
+
+		total = 0;
+		dp = 0;
+		mp = mn[0];
+		for (d = 1; d <= 31; d++) {
+			if (!mn[d]) continue;
+			if (mp > 0) {
+				if (mn[d] > 0)
+					count = mn[d] - mp;
+				else
+					count = -mn[d];
+				if (count <= 0) {
+					buffer_free(&dst);
+					return html_error(NULL);
+				}
+				total += count;
+				if (count > 999) count = 999;
+				buffer_appendf(&dst, "<b>%u</b>:", dp + 1);
+				for (n = 1; n <= count; n++)
+					buffer_appendf(&dst,
+					    " <a href=\"%02u/%u\">%u</a>",
+					    dp + 1, n, n);
+				buffer_appends(&dst, "<br>\n");
+			}
+			mp = mn[d];
+			dp = d;
+		}
+
+		if (total)
+			buffer_appendf(&dst, "<p>%u message%s\n",
+			    total, total == 1 ? "" : "s");
+		else
+			buffer_appends(&dst, "No messages\n");
+	}
 
 	if (dst.error) {
 		buffer_free(&dst);
@@ -474,60 +519,72 @@ int html_year_index(char *list, unsigned int y)
 
 	buffer_appends(&dst, "\n\n");
 
-	if (min_y == max_y)
-		buffer_appends(&dst, "<a href=\"..\">[list]</a>\n");
-
-	buffer_appends(&dst, "<p><h2>");
-	if (min_y == max_y)
-		buffer_appendf(&dst, "%u", y);
-	else
-		buffer_appendf(&dst, "%s mailing list", list);
-	buffer_appends(&dst, "</h2>\n<p>");
-
-	total = 0;
-	rday = 1;
-	mp = mn[0];
-	for (y = min_y; y <= max_y; y++) {
-		yearly_total = 0;
-		for (m = 1; m <= 12; m++) {
-			monthly_total = 0;
-			for (d = 1; d <= 31; d++, rday++) {
-				if (!mn[rday]) continue;
-				if (mp > 0) {
-					if (mn[rday] > 0)
-						count = mn[rday] - mp;
-					else
-						count = -mn[rday];
-					if (count <= 0) {
-						buffer_free(&dst);
-						free(mn);
-						return html_error(NULL);
-					}
-					monthly_total += count;
-				}
-				mp = mn[rday];
-			}
-			if (monthly_total) {
-				yearly_total += monthly_total;
-				buffer_appends(&dst, "<a href=\"");
-				if (min_y != max_y)
-					buffer_appendf(&dst, "%u/", y);
-				buffer_appendf(&dst,
-				    "%02u/\">%u/%02u</a>: %u message%s<br>\n",
-				    m, y, m, monthly_total,
-				    monthly_total == 1 ? "" : "s");
-			}
-		}
-		total += yearly_total;
+	if (html_flags & HTML_HEADER) {
+		buffer_appends(&dst, "<title>");
+		buffer_append_html(&dst, list, strlen(list));
+		buffer_appends(&dst, " mailing list");
+		if (min_y == max_y)
+			buffer_appendf(&dst, " - %u", y);
+		buffer_appends(&dst, "</title>\n");
 	}
 
-	free(mn);
+	if (html_flags & HTML_BODY) {
+		if (min_y == max_y)
+			buffer_appends(&dst, "<a href=\"..\">[list]</a>\n");
 
-	if (total)
-		buffer_appendf(&dst, "<p>%u message%s\n",
-		    total, total == 1 ? "" : "s");
-	else
-		buffer_appends(&dst, "No messages\n");
+		buffer_appends(&dst, "<p><h2>");
+		buffer_append_html(&dst, list, strlen(list));
+		buffer_appends(&dst, " mailing list");
+		if (min_y == max_y)
+			buffer_appendf(&dst, " - %u", y);
+		buffer_appends(&dst, "</h2>\n<p>");
+
+		total = 0;
+		rday = 1;
+		mp = mn[0];
+		for (y = min_y; y <= max_y; y++) {
+			yearly_total = 0;
+			for (m = 1; m <= 12; m++) {
+				monthly_total = 0;
+				for (d = 1; d <= 31; d++, rday++) {
+					if (!mn[rday]) continue;
+					if (mp > 0) {
+						if (mn[rday] > 0)
+							count = mn[rday] - mp;
+						else
+							count = -mn[rday];
+						if (count <= 0) {
+							buffer_free(&dst);
+							free(mn);
+							return html_error(NULL);
+						}
+						monthly_total += count;
+					}
+					mp = mn[rday];
+				}
+				if (monthly_total) {
+					yearly_total += monthly_total;
+					buffer_appends(&dst, "<a href=\"");
+					if (min_y != max_y)
+						buffer_appendf(&dst, "%u/", y);
+					buffer_appendf(&dst,
+					    "%02u/\">%u/%02u</a>: "
+					    "%u message%s<br>\n",
+					    m, y, m, monthly_total,
+					    monthly_total == 1 ? "" : "s");
+				}
+			}
+			total += yearly_total;
+		}
+
+		free(mn);
+
+		if (total)
+			buffer_appendf(&dst, "<p>%u message%s\n",
+			    total, total == 1 ? "" : "s");
+		else
+			buffer_appends(&dst, "No messages\n");
+	}
 
 	if (dst.error) {
 		buffer_free(&dst);
