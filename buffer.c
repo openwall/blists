@@ -83,11 +83,11 @@ int buffer_appendf(struct buffer *buf, char *fmt, ...)
 		va_end(args);
 
 		if (n >= 0) {
-			length = n + 1;
 			if (n < size) {
-				buf->ptr += length;
+				buf->ptr += n;
 				return 0;
 			}
+			length = n + 1;
 		} else
 			length = size << 1;
 	} while (length > size);

@@ -16,8 +16,14 @@ extern int html_message(char *list,
 	unsigned int y, unsigned int m, unsigned int d, unsigned int n);
 
 /*
- * Outputs the message index for the specified list and month to stdout.
+ * Outputs the message index for the specified month to stdout.
  */
-extern int html_index(char *list, unsigned int y, unsigned int m);
+extern int html_month_index(char *list, unsigned int y, unsigned int m);
+
+/*
+ * Outputs the summary with hyperlinks for the specified year to stdout.
+ * If the year is specified as 0, the summary for all years is output.
+ */
+extern int html_year_index(char *list, unsigned int y);
 
 #endif
