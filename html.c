@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <string.h>
+#include <errno.h>
 
 #include "params.h"
 #include "index.h"
@@ -149,10 +150,12 @@ int html_message(char *list,
 	}
 
 	fd = open(idx_file, O_RDONLY);
+	error = errno;
 	free(idx_file);
 	if (fd < 0) {
 		free(list_file);
-		return html_error("No such mailing list");
+		return html_error(error == ENOENT ?
+		    "No such mailing list" : NULL);
 	}
 
 	idx_offset = aday * sizeof(idx_msgnum_t);
@@ -162,7 +165,7 @@ int html_message(char *list,
 	if (error || m1 < 1 || m1 >= MAX_MAILBOX_MESSAGES) {
 		close(fd);
 		free(list_file);
-		return html_error(NULL);
+		return html_error((error || m1) ? NULL : "No such message");
 	}
 	m1r = m1 + n - (1 + 1); /* both m1 and n are 1-based; m1r is 0-based */
 	idx_offset = N_ADAY * sizeof(idx_msgnum_t) + m1r * sizeof(idx_msg[1]);
@@ -327,6 +330,73 @@ int html_message(char *list,
 
 	if (trunc)
 		buffer_append(&dst, "[ TRUNCATED ]<br>\n", 18);
+
+	write_loop(STDOUT_FILENO, dst.start, dst.ptr - dst.start);
+
+	buffer_free(&dst);
+
+	return 0;
+}
+
+int html_index(char *list, unsigned int y, unsigned int m)
+{
+	unsigned int d, n, aday, dp, count;
+	char *idx_file;
+	off_t idx_offset;
+	int fd, error;
+	idx_msgnum_t mn[32], mp;
+	struct buffer dst;
+
+	if (y < MIN_YEAR || y > MAX_YEAR ||
+	    m < 1 || m > 12)
+		return html_error("Invalid date");
+	aday = (y - MIN_YEAR) * 366 + (m - 1) * 31;
+
+	idx_file = concat(MAIL_SPOOL_PATH "/", list,
+	    INDEX_FILENAME_SUFFIX, NULL);
+	if (!idx_file)
+		return html_error(NULL);
+
+	fd = open(idx_file, O_RDONLY);
+	error = errno;
+	free(idx_file);
+	if (fd < 0)
+		return html_error(error == ENOENT ?
+		    "No such mailing list" : NULL);
+
+	idx_offset = aday * sizeof(idx_msgnum_t);
+	error =
+	    lseek(fd, idx_offset, SEEK_SET) != idx_offset ||
+	    read_loop(fd, (char *)mn, sizeof(mn)) != sizeof(mn);
+	if (close(fd) || error)
+		return html_error(NULL);
+
+	if (buffer_alloc(&dst, 100000)) /* XXX */
+		return html_error(NULL);
+
+	buffer_append(&dst, "\n\n", 2);
+
+	dp = 0;
+	mp = mn[0];
+	for (d = 1; d <= 31; d++) {
+		if (mn[d]) {
+			if (mp) {
+				count = mn[d] - mp;
+				sprintf(dst.ptr, "<b>%u</b>:", dp + 1);
+				dst.ptr += strlen(dst.ptr); /* XXX */
+				for (n = 1; n <= count; n++) {
+					snprintf(dst.ptr, 250,
+					    " <a href=\"/lists/%s/%u/%02u"
+					    "/%02u/%u\">%u</a>",
+					    list, y, m, dp + 1, n, n);
+					dst.ptr += strlen(dst.ptr); /* XXX */
+				}
+				buffer_append(&dst, "<br>\n", 5);
+			}
+			mp = mn[d];
+			dp = d;
+		}
+	}
 
 	write_loop(STDOUT_FILENO, dst.start, dst.ptr - dst.start);
 

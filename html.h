@@ -15,4 +15,9 @@ extern int html_error(char *msg);
 extern int html_message(char *list,
 	unsigned int y, unsigned int m, unsigned int d, unsigned int n);
 
+/*
+ * Outputs the message index for the specified list and month to stdout.
+ */
+extern int html_index(char *list, unsigned int y, unsigned int m);
+
 #endif
