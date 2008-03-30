@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <time.h>
@@ -20,7 +21,16 @@
 #include "misc.h"
 #include "mailbox.h"
 
+/*
+ * For each absolute day number ("aday"), num_by_aday[] elements can be:
+ * > 0 meaning 1-based starting message number for the day or
+ * <= 0 meaning sign-changed message count for the previous day.
+ * In either case, it is trivial to determine the message count from two
+ * adjacent elements.  We allocate one more element (beyond N_ADAY) to
+ * possibly hold the sign-changed message count for the last day.
+ */
 static idx_msgnum_t num_by_aday[N_ADAY + 1];
+
 static idx_msgnum_t msg_num, msg_alloc;
 static struct idx_message *msgs;
 
@@ -120,6 +130,9 @@ static int msgs_link(void)
 	}
 
 	for (i = 0, m = msgs; i < msg_num; i++, m++) {
+		/* The following assignment eliminates link cycles that may
+		 * cause an infinite loop in incremental mode. */
+		m->t.nn = m->t.pn = 0;
 		if (!(m->flags & IDX_F_HAVE_MSGID)) continue;
 		pool[i].msg = m;
 		hv = m->msgid_hash[0] | ((unsigned int)m->msgid_hash[1] << 8);
@@ -174,17 +187,22 @@ static int cmp_msgs_by_day(const void *p1, const void *p2)
 	return (int)m1->d - (int)m2->d;
 }
 
-static int msgs_final(void)
+static int msgs_final(idx_msgnum_t start_from)
 {
 	idx_msgnum_t i;
 	struct idx_message *m;
 	unsigned int aday, prev_aday;
 
 retry:
-	memset(num_by_aday, 0, sizeof(num_by_aday));
-
 	prev_aday = 0;
-	for (i = 0, m = msgs; i < msg_num; i++, m++) {
+	if (start_from) {
+		for (i = 0; i < N_ADAY; i++)
+			if (num_by_aday[i] > 0)
+				prev_aday = i;
+	} else
+		memset(num_by_aday, 0, sizeof(num_by_aday));
+
+	for (i = start_from, m = msgs + start_from; i < msg_num; i++, m++) {
 		aday = YMD2ADAY(m->y, m->m, m->d);
 
 		if (aday < prev_aday) {
@@ -193,6 +211,7 @@ retry:
 			    prev_aday, aday, MIN_YEAR + m->y, m->m, m->d);
 			qsort(msgs, msg_num, sizeof(*msgs), cmp_msgs_by_day);
 			fprintf(stderr, "done.\n");
+			start_from = 0;
 			goto retry;
 		}
 		prev_aday = aday;
@@ -220,6 +239,59 @@ static int eq(char *s1, int n1, char *s2, int n2)
 	return !strncasecmp(s1, s2, n2);
 }
 
+static off_t begin_inc_idx(int idx_fd, int fd)
+{
+	struct idx_message m;
+	struct idx_message *mptr;
+	off_t mailbox_size;
+	off_t inc_ofs = 0;
+	int error = 0;
+
+	if (read_loop(idx_fd, &num_by_aday, sizeof(num_by_aday)) !=
+	    sizeof(num_by_aday))
+		return 0;
+
+	msg_num = 0;
+	msg_alloc = 0;
+	msgs = NULL;
+
+	/*
+	 * We cannot just get the last index entry to detect the offset up to
+	 * which the mailbox was indexed so far: the order of index entries
+	 * may have been changed by qsort() called from msgs_final().
+	 *
+	 * This will need to be re-worked to not read message structs one by
+	 * one (inefficient).
+	 */
+	while (read_loop(idx_fd, &m, sizeof(m)) == sizeof(m)) {
+		off_t new_inc_ofs = m.offset + m.size + 1;
+		if (new_inc_ofs > inc_ofs)
+			inc_ofs = new_inc_ofs;
+		mptr = msgs_grow();
+		if (!mptr) {
+			error = 1;
+			break;
+		}
+		memcpy(mptr, &m, sizeof(m));
+	}
+	if (!error) {
+		if ((mailbox_size = lseek(fd, 0, SEEK_END)) < 0)
+			return -1;
+		if (mailbox_size < inc_ofs) {
+/* XXX: This is also triggered when the mbox doesn't end with an empty line */
+			fprintf(stderr, "Warning: mailbox size reduced, "
+			    "performing full indexing\n");
+			error = 1;
+		}
+	}
+	if (error) {
+		if (msgs) free(msgs);
+		return 0;
+	}
+
+	return inc_ofs;
+}
+
 /*
  * The mailbox parsing routine.
  * We implement a state machine at the line fragment level (that is, full or
@@ -239,11 +311,15 @@ static int mailbox_parse_fd(int fd)
 	int block, saved, extra, length;	/* Internal block sizes */
 	int done, start, end;			/* Various boolean flags: */
 	int blank, header, body;		/* the state information */
+	off_t unindexed_size, inc_ofs;
 
+	inc_ofs = lseek(fd, 0, SEEK_CUR);
+	if (inc_ofs < 0) return 1;
 	if (fstat(fd, &stat)) return 1;
-
+	unindexed_size = stat.st_size - inc_ofs;
+	if (!unindexed_size) return 0;
+	if (unindexed_size < 0) return 1;
 	if (!S_ISREG(stat.st_mode)) return 1;
-	if (!stat.st_size) return 0;
 	if (stat.st_size > MAX_MAILBOX_BYTES || stat.st_size > ~0UL) return 1;
 
 	memset(&msg, 0, sizeof(msg));
@@ -252,8 +328,8 @@ static int mailbox_parse_fd(int fd)
 	if (!file_buffer) return 1;
 	line_buffer = &file_buffer[FILE_BUFFER_SIZE];
 
-	file_offset = 0; line_offset = 0; offset = 0;	/* Start at 0, with */
-	current = file_buffer; block = 0; saved = 0;	/* empty buffers */
+	file_offset = line_offset = offset = inc_ofs;	/* Start at inc_ofs, */
+	current = file_buffer; block = 0; saved = 0;	/* and empty buffers */
 
 	done = 0;	/* Haven't reached EOF or the original size yet */
 	end = 1;	/* Assume we've just seen a LF: parse a new line */
@@ -353,7 +429,7 @@ static int mailbox_parse_fd(int fd)
 		    line[1] == 'r' && line[2] == 'o' && line[3] == 'm' &&
 		    line[4] == ' ') {
 /* Process the previous one first, if exists */
-			if (offset) {
+			if (offset > inc_ofs) {
 /* If we aren't at the very beginning, there must have been a message */
 				if (!msg.data_offset) break;
 				msg.raw_size = offset - msg.raw_offset;
@@ -472,24 +548,40 @@ int mailbox_parse(char *mailbox)
 	off_t idx_size;
 	size_t msgs_size;
 	int error;
+	idx_msgnum_t old_msg_num;
+	off_t inc_ofs = 0;
 
 	fd = open(mailbox, O_RDONLY);
 	if (fd < 0) return 1;
 
+	error = lock_fd(fd, 1);
+
 	idx_fd = -1;
 	idx = concat(mailbox, INDEX_FILENAME_SUFFIX, NULL);
 	if (idx) {
-		idx_fd = open(idx, O_CREAT | O_WRONLY, 0644);
+		if (!error && (idx_fd = open(idx, O_RDWR)) >= 0) {
+			error = lock_fd(idx_fd, 1);
+			if (!error) {
+				inc_ofs = begin_inc_idx(idx_fd, fd);
+				error = inc_ofs < 0;
+			}
+			if (unlock_fd(idx_fd) && !error) error = 1;
+		}
+		if (!error && idx_fd < 0)
+			idx_fd = open(idx, O_CREAT | O_WRONLY, 0644);
 		free(idx);
 	}
 	error = idx_fd < 0;
 
-	msg_num = 0;
-	msg_alloc = 0;
-	msgs = NULL;
-
+	if (inc_ofs <= 0) {
+		inc_ofs = 0;
+		msg_num = 0;
+		msg_alloc = 0;
+		msgs = NULL;
+	}
+	old_msg_num = msg_num;
 	if (!error)
-		error = lock_fd(fd, 1);
+		error = lseek(fd, inc_ofs, SEEK_SET) != inc_ofs;
 
 	if (!error) {
 		error = mailbox_parse_fd(fd);
@@ -499,20 +591,22 @@ int mailbox_parse(char *mailbox)
 	if (close(fd) && !error) error = 1;
 
 	if (!error)
-		error = msgs_final();
+		error = msgs_final(old_msg_num) < 0;
 
 	if (!error)
 		error = lock_fd(idx_fd, 0);
 
 	if (!error)
+		error = lseek(idx_fd, 0, SEEK_SET) != 0;
+
+	if (!error)
 		error =
-		    write_loop(idx_fd, (char *)num_by_aday, sizeof(num_by_aday))
+		    write_loop(idx_fd, num_by_aday, sizeof(num_by_aday))
 		    != sizeof(num_by_aday);
 
 	if (!error) {
 		msgs_size = msg_num * sizeof(struct idx_message);
-		error =
-		    write_loop(idx_fd, (char *)msgs, msgs_size) != msgs_size;
+		error = write_loop(idx_fd, msgs, msgs_size) != msgs_size;
 	}
 
 	free(msgs);

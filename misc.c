@@ -15,7 +15,11 @@
 
 #include "params.h"
 
-int sleep_select(int sec, int usec)
+/*
+ * A select(2)-based sleep() equivalent: no more problems with SIGALRM,
+ * subsecond precision.
+ */
+static int sleep_select(int sec, int usec)
 {
 	struct timeval timeout;
 
@@ -67,13 +71,31 @@ int unlock_fd(int fd)
 	return 0;
 }
 
-int write_loop(int fd, char *buffer, int count)
+int read_loop(int fd, void *buffer, int count)
 {
 	int offset, block;
 
 	offset = 0;
 	while (count > 0) {
-		block = write(fd, &buffer[offset], count);
+		block = read(fd, (char *)buffer + offset, count);
+
+		if (block < 0) return block;
+		if (!block) return offset;
+
+		offset += block;
+		count -= block;
+	}
+
+	return offset;
+}
+
+int write_loop(int fd, const void *buffer, int count)
+{
+	int offset, block;
+
+	offset = 0;
+	while (count > 0) {
+		block = write(fd, (char *)buffer + offset, count);
 
 /* If any write(2) fails, we consider that the entire write_loop() has
  * failed to do its job.  We don't even ignore EINTR here.  We also don't
@@ -90,10 +112,11 @@ int write_loop(int fd, char *buffer, int count)
 	return offset;
 }
 
-char *concat(char *s1, ...)
+char *concat(const char *s1, ...)
 {
 	va_list args;
-	char *s, *p, *result;
+	const char *s;
+	char *p, *result;
 	unsigned long l, m, n;
 
 	m = n = strlen(s1);
@@ -105,7 +128,7 @@ char *concat(char *s1, ...)
 	va_end(args);
 	if (s || m >= INT_MAX) return NULL;
 
-	result = malloc(m + 1);
+	result = (char *)malloc(m + 1);
 	if (!result) return NULL;
 
 	memcpy(p = result, s1, n);
@@ -118,7 +141,7 @@ char *concat(char *s1, ...)
 		p += l;
 	}
 	va_end(args);
-	if (s || m != n || p - result != n) {
+	if (s || m != n || p != result + n) {
 		free(result);
 		return NULL;
 	}

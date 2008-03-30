@@ -61,28 +61,6 @@ static void buffer_append_header(struct buffer *dst, char *what)
 	buffer_appendc(dst, '\n');
 }
 
-/*
- * Attempts to read until EOF, and returns the number of bytes read.
- * We don't expect any signals, so even EINTR is considered an error.
- */
-static int read_loop(int fd, char *buffer, int count)
-{
-	int offset, block;
-
-	offset = 0;
-	while (count > 0) {
-		block = read(fd, &buffer[offset], count);
-
-		if (block < 0) return block;
-		if (!block) return offset;
-
-		offset += block;
-		count -= block;
-	}
-
-	return offset;
-}
-
 int html_error(char *msg)
 {
 	if (!msg)
@@ -145,7 +123,7 @@ int html_message(char *list,
 	error =
 	    lock_fd(fd, 1) ||
 	    lseek(fd, idx_offset, SEEK_SET) != idx_offset ||
-	    read_loop(fd, (char *)&m1, sizeof(m1)) != sizeof(m1);
+	    read_loop(fd, &m1, sizeof(m1)) != sizeof(m1);
 	if (error || m1 < 1 || m1 >= MAX_MAILBOX_MESSAGES) {
 		close(fd);
 		free(list_file);
@@ -159,7 +137,7 @@ int html_message(char *list,
 		idx_offset -= sizeof(idx_msg[0]);
 		error = lseek(fd, idx_offset, SEEK_SET) != idx_offset;
 		got = error ? -1 :
-		    read_loop(fd, (char *)&idx_msg, sizeof(idx_msg));
+		    read_loop(fd, &idx_msg, sizeof(idx_msg));
 		if (got != sizeof(idx_msg)) {
 			error = got != sizeof(idx_msg[0]) * 2;
 			idx_msg[2] = idx_msg[1];
@@ -169,7 +147,7 @@ int html_message(char *list,
 		prev = 0;
 		error = lseek(fd, idx_offset, SEEK_SET) != idx_offset;
 		got = error ? -1 :
-		    read_loop(fd, (char *)&idx_msg[1], sizeof(idx_msg[1]) * 2);
+		    read_loop(fd, &idx_msg[1], sizeof(idx_msg[1]) * 2);
 		if (got != sizeof(idx_msg[1]) * 2) {
 			error = got != sizeof(idx_msg[1]);
 			idx_msg[2] = idx_msg[1];
@@ -184,7 +162,7 @@ int html_message(char *list,
 		idx_offset = aday * sizeof(m0);
 		error =
 		    lseek(fd, idx_offset, SEEK_SET) != idx_offset ||
-		    read_loop(fd, (char *)&m0, sizeof(m0)) != sizeof(m0);
+		    read_loop(fd, &m0, sizeof(m0)) != sizeof(m0);
 		if (m1 > m0)
 			n0 = m1 - m0;
 		else
@@ -440,7 +418,7 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 	error =
 	    lock_fd(fd, 1) ||
 	    lseek(fd, idx_offset, SEEK_SET) != idx_offset ||
-	    read_loop(fd, (char *)mn, sizeof(mn)) != sizeof(mn);
+	    read_loop(fd, mn, sizeof(mn)) != sizeof(mn);
 	if (unlock_fd(fd)) error = 1;
 	if (close(fd) || error || buffer_init(&dst, 0))
 		return html_error(NULL);
@@ -555,7 +533,7 @@ int html_year_index(char *list, unsigned int y)
 	error =
 	    lock_fd(fd, 1) ||
 	    (idx_offset && lseek(fd, idx_offset, SEEK_SET) != idx_offset) ||
-	    read_loop(fd, (char *)mn, mn_size) != mn_size;
+	    read_loop(fd, mn, mn_size) != mn_size;
 	if (unlock_fd(fd)) error = 1;
 	if (close(fd) || error || buffer_init(&dst, 0)) {
 		free(mn);
