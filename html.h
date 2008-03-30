@@ -3,6 +3,7 @@
 
 #define HTML_HEADER			1
 #define HTML_BODY			2
+#define HTML_CENSOR			4
 
 /* Header vs. body */
 extern int html_flags;

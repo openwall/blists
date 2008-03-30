@@ -16,6 +16,10 @@ int main(int argc, char **argv)
 			html_flags = HTML_HEADER;
 		else if (!strcmp(argv[1], "body"))
 			html_flags = HTML_BODY;
+		else if (!strcmp(argv[1], "header-censored"))
+			html_flags = HTML_HEADER | HTML_CENSOR;
+		else if (!strcmp(argv[1], "body-censored"))
+			html_flags = HTML_BODY | HTML_CENSOR;
 		else
 			return html_error(NULL);
 	}

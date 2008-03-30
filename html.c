@@ -279,6 +279,9 @@ int html_message(char *list,
 			    subject + 9, strlen(subject + 9));
 		}
 		buffer_appends(&dst, "</title>\n");
+		if (html_flags & HTML_CENSOR)
+			buffer_appends(&dst,
+			    "<meta name=\"robots\" content=\"noindex\">\n");
 	}
 
 	if (html_flags & HTML_BODY) {
@@ -335,6 +338,7 @@ int html_message(char *list,
 			buffer_append_header(&dst, to);
 		if (subject)
 			buffer_append_header(&dst, subject);
+		if (!(html_flags & HTML_CENSOR))
 		do {
 			if (mime.entities->boundary) {
 				body = mime_next_body_part(&mime);
@@ -367,6 +371,9 @@ int html_message(char *list,
 		} while (bend < src.end && mime.entities);
 		buffer_appends(&dst, "</pre>\n");
 
+		if (html_flags & HTML_CENSOR)
+			buffer_appends(&dst, "[ REMOVED ]\n");
+		else
 		if (trunc)
 			buffer_appends(&dst, "[ TRUNCATED ]\n");
 	}
