@@ -146,7 +146,7 @@ static int msgs_link(void)
 		irt = hash[hv];
 		while (irt) {
 			if (!memcmp(m->irt_hash, irt->msg->msgid_hash,
-			    sizeof(idx_hash_t)))
+			    sizeof(idx_hash_t)) && m != irt->msg)
 				break;
 			irt = irt->next_hash;
 		}
