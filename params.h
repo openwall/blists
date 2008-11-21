@@ -26,9 +26,11 @@
 /*
  * Introduce some sane limits on the mailbox size in order to prevent
  * a single huge mailbox from stopping the entire service.
+ * Well, that was the original intent; these got insane for blists, which
+ * does incremental index updates and supports 64-bit file offsets now.
  */
-#define MAX_MAILBOX_MESSAGES		2097152
-#define MAX_MAILBOX_BYTES		2147483647
+#define MAX_MAILBOX_MESSAGES		(100 * 1000 * 1000)
+#define MAX_MAILBOX_BYTES		(100ULL * 1024 * 1024 * 1024)
 
 /*
  * Locking method your system uses for user mailboxes.  It is important

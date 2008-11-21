@@ -2,7 +2,7 @@ CC = gcc
 LD = $(CC)
 RM = rm -f
 MKDIR = mkdir -p
-CFLAGS = -c -Wall -O2 -fomit-frame-pointer
+CFLAGS = -c -Wall -O2 -fomit-frame-pointer -D_FILE_OFFSET_BITS=64
 LDFLAGS = -s
 
 PROJ = bindex bit
