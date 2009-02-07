@@ -32,21 +32,19 @@ static char *detect_url(char *what, char *colon, char *end,
 {
 	char *ptr, *url, *hostname;
 
-	ptr = colon - 5;
-	url = NULL;
-	if (ptr >= what && !memcmp(ptr, "https", 5))
+	if (colon - what >= 5 && !memcmp((ptr = colon - 5), "https", 5))
 		url = ptr;
-	else if (++ptr >= what && !memcmp(ptr, "http", 4))
+	else if (colon - what >= 4 && !memcmp((ptr = colon - 4), "http", 4))
 		url = ptr;
-	else if (++ptr >= what && !memcmp(ptr, "ftp", 3))
+	else if (colon - what >= 3 && !memcmp((ptr = colon - 3), "ftp", 3))
 		url = ptr;
-	if (!url) return NULL;
+	else
+		return NULL;
 
-	ptr = colon + 3;
-	if (ptr >= end) return NULL;
+	if (end - colon <= 3) return NULL;
 	if (memcmp(colon, "://", 3)) return NULL;
 
-	hostname = ptr;
+	ptr = hostname = colon + 3;
 	while (ptr < end &&
 	    ((*ptr >= 'a' && *ptr <= 'z') ||
 	     (*ptr >= 'A' && *ptr <= 'Z') ||
@@ -129,21 +127,13 @@ static void buffer_append_html_generic(struct buffer *dst, char *what,
 			else
 				buffer_appendc(dst, c);
 			break;
-		case '@':
-			if (ptr - 1 > what && ptr + 3 < end &&
-			    *(ptr - 2) > ' ' && *ptr > ' ' &&
-			    *(ptr + 1) > ' ' && *(ptr + 2) > ' ') {
-				buffer_appends(dst, "@...");
-				ptr += 3;
-				break;
-			}
 		case ':':
 			url = NULL;
-			if (detect_urls)
+			if (detect_urls && ptr < end && *ptr == '/')
 				url = detect_url(what, ptr - 1, end,
 				    &url_length, &url_safe);
 			if (url && url_length <= MAX_URL_LENGTH &&
-			    dst->ptr - (ptr - 1 - url) >= dst->start) {
+			    dst->ptr - dst->start >= ptr - 1 - url) {
 				dst->ptr -= ptr - 1 - url;
 				buffer_appends(dst, "<a href=\"");
 				buffer_append_html_generic(dst,
@@ -161,6 +151,15 @@ static void buffer_append_html_generic(struct buffer *dst, char *what,
 			} else
 				buffer_appendc(dst, c);
 			break;
+		case '@':
+			if (ptr - what >= 2 && end - ptr >= 4 &&
+			    *(ptr - 2) > ' ' && *ptr > ' ' &&
+			    *(ptr + 1) > ' ' && *(ptr + 2) > ' ') {
+				buffer_appends(dst, "&#64;...");
+				ptr += 3;
+				break;
+			}
+			/* FALLTHRU */
 		case '\t':
 		case '\n':
 			buffer_appendc(dst, c);
