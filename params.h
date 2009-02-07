@@ -20,8 +20,13 @@
  * Truncate messages larger than the maximum size at the (possibly lower)
  * truncation point.
  */
-#define MAX_MESSAGE_SIZE		102400
-#define MAX_MESSAGE_SIZE_TRUNC		20480
+#define MAX_MESSAGE_SIZE		(1024 * 1024)
+#define MAX_MESSAGE_SIZE_TRUNC		(100 * 1024)
+
+/*
+ * Don't turn URLs longer than this number of characters into hyperlinks.
+ */
+#define MAX_URL_LENGTH			1024
 
 /*
  * Introduce some sane limits on the mailbox size in order to prevent

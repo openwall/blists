@@ -14,9 +14,99 @@
 
 int html_flags = HTML_BODY;
 
-static void buffer_append_html(struct buffer *dst, char *what, size_t length)
+/*
+ * Checks if the hostname ending just before end belongs to domain.
+ */
+static int match_domain(char *hostname, char *end, char *domain)
 {
-	char *ptr, *end;
+	size_t hostname_length = end - hostname;
+	size_t domain_length = strlen(domain);
+	if (hostname_length < domain_length) return 0;
+	if (strncasecmp(end - domain_length, domain, domain_length)) return 0;
+	return hostname_length == domain_length ||
+	    *(end - domain_length - 1) == '.';
+}
+
+static char *detect_url(char *what, char *colon, char *end,
+	size_t *url_length, int *safe)
+{
+	char *ptr, *url, *hostname;
+
+	ptr = colon - 5;
+	url = NULL;
+	if (ptr >= what && !memcmp(ptr, "https", 5))
+		url = ptr;
+	else if (++ptr >= what && !memcmp(ptr, "http", 4))
+		url = ptr;
+	else if (++ptr >= what && !memcmp(ptr, "ftp", 3))
+		url = ptr;
+	if (!url) return NULL;
+
+	ptr = colon + 3;
+	if (ptr >= end) return NULL;
+	if (memcmp(colon, "://", 3)) return NULL;
+
+	hostname = ptr;
+	while (ptr < end &&
+	    ((*ptr >= 'a' && *ptr <= 'z') ||
+	     (*ptr >= 'A' && *ptr <= 'Z') ||
+	     (*ptr >= '0' && *ptr <= '9') ||
+	     ((*ptr == '-' || *ptr == '.') && ptr > hostname)))
+		ptr++;
+	while (ptr > hostname && *(ptr - 1) == '.')
+		ptr--;
+	if (ptr <= hostname) return NULL;
+
+	*safe = match_domain(hostname, ptr, "openwall.com") ||
+		match_domain(hostname, ptr, "openwall.net") ||
+		match_domain(hostname, ptr, "openwall.org") ||
+		match_domain(hostname, ptr, "openwall.info");
+
+	if (ptr == end || *ptr != '/') {
+		/* Let's not detect URLs with userinfo or port */
+		if (*ptr == '@' || *ptr == ':')
+			return NULL;
+		*url_length = ptr - url;
+		return url;
+	}
+
+	/* RFC 3986 path-abempty [ "?" query ] [ "#" fragment ] */
+	while (ptr < end &&
+	    ((*ptr >= 'a' && *ptr <= 'z') ||
+	     (*ptr >= 'A' && *ptr <= 'Z') ||
+	     (*ptr >= '0' && *ptr <= '9') ||
+	     *ptr == '/' ||
+	     *ptr == '-' || *ptr == '.' || *ptr == '_' || *ptr == '~' ||
+	     *ptr == '%' ||
+	     *ptr == '!' || *ptr == '$' || *ptr == '&' || *ptr == '\'' ||
+	     *ptr == '(' || *ptr == ')' || *ptr == '*' || *ptr == '+' ||
+	     *ptr == ',' || *ptr == ';' || *ptr == '=' ||
+	     *ptr == ':' || *ptr == '@' ||
+	     *ptr == '?' || *ptr == '#')) {
+		/* Let's not detect URLs with likely e-mail addresses because
+		 * we'd need to obfuscate the addresses, breaking the URLs. */
+		if (*ptr == '@')
+			return NULL;
+		ptr++;
+	}
+
+	/* These characters are unlikely to be part of the URL in practice */
+	while (--ptr > hostname &&
+	    (*ptr == '.' || *ptr == '!' || *ptr == ')' || *ptr == ',' ||
+	     *ptr == ';' || *ptr == ':' || *ptr == '?'))
+		;
+	ptr++;
+
+	*url_length = ptr - url;
+	return url;
+}
+
+static void buffer_append_html_generic(struct buffer *dst, char *what,
+	size_t length, int quotes, int detect_urls)
+{
+	char *ptr, *end, *url;
+	size_t url_length;
+	int url_safe;
 	unsigned char c;
 
 	ptr = what;
@@ -33,6 +123,12 @@ static void buffer_append_html(struct buffer *dst, char *what, size_t length)
 		case '&':
 			buffer_appends(dst, "&amp;");
 			break;
+		case '"':
+			if (quotes)
+				buffer_appends(dst, "&quot;");
+			else
+				buffer_appendc(dst, c);
+			break;
 		case '@':
 			if (ptr - 1 > what && ptr + 3 < end &&
 			    *(ptr - 2) > ' ' && *ptr > ' ' &&
@@ -41,6 +137,30 @@ static void buffer_append_html(struct buffer *dst, char *what, size_t length)
 				ptr += 3;
 				break;
 			}
+		case ':':
+			url = NULL;
+			if (detect_urls)
+				url = detect_url(what, ptr - 1, end,
+				    &url_length, &url_safe);
+			if (url && url_length <= MAX_URL_LENGTH &&
+			    dst->ptr - (ptr - 1 - url) >= dst->start) {
+				dst->ptr -= ptr - 1 - url;
+				buffer_appends(dst, "<a href=\"");
+				buffer_append_html_generic(dst,
+				    url, url_length, 1, 0);
+				if (url_safe)
+					buffer_appends(dst, "\">");
+				else
+					buffer_appends(dst,
+					    "\" rel=\"nofollow\">");
+				buffer_append_html_generic(dst,
+				    url, url_length, 0, 0);
+				buffer_appends(dst, "</a>");
+				ptr = url + url_length;
+				break;
+			} else
+				buffer_appendc(dst, c);
+			break;
 		case '\t':
 		case '\n':
 			buffer_appendc(dst, c);
@@ -55,9 +175,19 @@ static void buffer_append_html(struct buffer *dst, char *what, size_t length)
 	}
 }
 
-static void buffer_append_header(struct buffer *dst, char *what)
+static void buffer_append_html(struct buffer *dst, char *what, size_t length)
+{
+	buffer_append_html_generic(dst, what, length, 0, 0);
+}
+
+static void buffer_appends_html(struct buffer *dst, char *what)
 {
 	buffer_append_html(dst, what, strlen(what));
+}
+
+static void buffer_append_header(struct buffer *dst, char *what)
+{
+	buffer_appends_html(dst, what);
 	buffer_appendc(dst, '\n');
 }
 
@@ -272,11 +402,10 @@ int html_message(char *list,
 
 	if (html_flags & HTML_HEADER) {
 		buffer_appends(&dst, "<title>");
-		buffer_append_html(&dst, list, strlen(list));
+		buffer_appends_html(&dst, list);
 		if (subject && strlen(subject) > 9) {
 			buffer_appends(&dst, " - ");
-			buffer_append_html(&dst,
-			    subject + 9, strlen(subject + 9));
+			buffer_appends_html(&dst, subject + 9);
 		}
 		buffer_appends(&dst, "</title>\n");
 		if (html_flags & HTML_CENSOR)
@@ -351,8 +480,7 @@ int html_message(char *list,
 			if (strncasecmp(mime.entities->type, "text/", 5) ||
 			    !strcasecmp(mime.entities->type, "text/html")) {
 				buffer_appends(&dst, "\n[ CONTENT OF TYPE ");
-				buffer_append_html(&dst, mime.entities->type,
-				    strlen(mime.entities->type));
+				buffer_appends_html(&dst, mime.entities->type);
 				buffer_appends(&dst, " SKIPPED ]\n");
 				body = NULL;
 			}
@@ -366,7 +494,8 @@ int html_message(char *list,
 				continue;
 			}
 			buffer_appendc(&dst, '\n');
-			buffer_append_html(&dst, body, mime.dst.ptr - body);
+			buffer_append_html_generic(&dst,
+			    body, mime.dst.ptr - body, 0, 1);
 			mime.dst.ptr = body;
 		} while (bend < src.end && mime.entities);
 		buffer_appends(&dst, "</pre>\n");
@@ -434,7 +563,7 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 
 	if (html_flags & HTML_HEADER) {
 		buffer_appends(&dst, "<title>");
-		buffer_append_html(&dst, list, strlen(list));
+		buffer_appends_html(&dst, list);
 		buffer_appendf(&dst, " mailing list - %u/%02u</title>\n", y, m);
 	}
 
@@ -444,7 +573,7 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 		    " <a href=\"../..\">[list]</a>\n");
 
 		buffer_appends(&dst, "<p><h2>");
-		buffer_append_html(&dst, list, strlen(list));
+		buffer_appends_html(&dst, list);
 		buffer_appendf(&dst, " mailing list - %u/%02u</h2>\n", y, m);
 
 		total = 0;
@@ -551,7 +680,7 @@ int html_year_index(char *list, unsigned int y)
 
 	if (html_flags & HTML_HEADER) {
 		buffer_appends(&dst, "<title>");
-		buffer_append_html(&dst, list, strlen(list));
+		buffer_appends_html(&dst, list);
 		buffer_appends(&dst, " mailing list");
 		if (min_y == max_y)
 			buffer_appendf(&dst, " - %u", y);
@@ -563,7 +692,7 @@ int html_year_index(char *list, unsigned int y)
 			buffer_appends(&dst, "<a href=\"..\">[list]</a>\n");
 
 		buffer_appends(&dst, "<p><h2>");
-		buffer_append_html(&dst, list, strlen(list));
+		buffer_appends_html(&dst, list);
 		buffer_appends(&dst, " mailing list");
 		if (min_y == max_y)
 			buffer_appendf(&dst, " - %u", y);
