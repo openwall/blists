@@ -1,5 +1,8 @@
 /*
  * Miscellaneous system and library call wrappers.
+ *
+ * Written by Solar Designer <solar at openwall.com> in 1998-2008, and placed
+ * in the public domain.  There's absolutely no warranty.
  */
 
 #ifndef _BLISTS_MISC_H

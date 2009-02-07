@@ -1,6 +1,9 @@
 /*
  * Miscellaneous system and library call wrappers.
  * See misc.h for the descriptions.
+ *
+ * Written by Solar Designer <solar at openwall.com> in 1998-2008, and placed
+ * in the public domain.  There's absolutely no warranty.
  */
 
 #include <unistd.h>

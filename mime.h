@@ -1,5 +1,8 @@
 /*
  * MIME message parsing.
+ *
+ * Written by Solar Designer <solar at openwall.com> in 2006, and placed
+ * in the public domain.  There's absolutely no warranty.
  */
 
 #ifndef _BLISTS_MIME_H
