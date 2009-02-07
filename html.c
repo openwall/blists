@@ -222,7 +222,7 @@ int html_message(char *list,
 	idx_size_t size;
 	struct buffer src, dst;
 	struct mime_ctx mime;
-	char *p, *q, *date, *from, *to, *subject, *body, *bend;
+	char *p, *q, *date, *from, *to, *cc, *subject, *body, *bend;
 
 	if (y < MIN_YEAR || y > MAX_YEAR ||
 	    m < 1 || m > 12 ||
@@ -348,7 +348,7 @@ int html_message(char *list,
 		return html_error(NULL);
 	}
 
-	date = from = to = subject = body = NULL;
+	date = from = to = cc = subject = body = NULL;
 	while (src.end - src.ptr > 9 && *src.ptr != '\n') {
 		switch (*src.ptr) {
 		case 'D':
@@ -381,7 +381,10 @@ int html_message(char *list,
 			break;
 		case 'C':
 		case 'c':
-			mime_decode_header(&mime);
+			if (!strncasecmp(src.ptr, "CC:", 3))
+				cc = mime_decode_header(&mime);
+			else
+				mime_decode_header(&mime);
 			continue;
 		}
 		mime_skip_header(&mime);
@@ -464,6 +467,8 @@ int html_message(char *list,
 			buffer_append_header(&dst, from);
 		if (to)
 			buffer_append_header(&dst, to);
+		if (cc)
+			buffer_append_header(&dst, cc);
 		if (subject)
 			buffer_append_header(&dst, subject);
 		if (!(html_flags & HTML_CENSOR))
