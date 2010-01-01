@@ -7,8 +7,8 @@
  */
 #define MAIL_SPOOL_PATH			"../../blists"
 
-#define MIN_YEAR			1990
-#define MAX_YEAR			2009
+#define MIN_YEAR			1970
+#define MAX_YEAR			2038
 
 /*
  * The suffix to append to a mailbox filename to form the corresponding
