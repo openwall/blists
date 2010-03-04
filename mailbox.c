@@ -116,10 +116,11 @@ static int message_process(struct parsed_message *msg)
 static int msgs_link(void)
 {
 	idx_msgnum_t i;
-	struct idx_message *m, *lit;
+	struct idx_message *m, *lit, *seen;
 	unsigned int aday;
 	struct mem_message *pool, **hash, *irt;
 	unsigned int hv;
+	unsigned int count;
 
 	pool = calloc(msg_num, sizeof(*pool));
 	if (!pool) return -1;
@@ -155,11 +156,16 @@ static int msgs_link(void)
 /* The following loop could be avoided by maintaining a thread index,
  * including a "last in thread" pointer for each thread, and pointers
  * from each message into the thread index. */
-		lit = irt->msg;
+		lit = seen = irt->msg;
+		count = 0;
 		while (lit->t.nn) {
 			aday = YMD2ADAY(lit->t.ny, lit->t.nm, lit->t.nd);
 			lit = &msgs[num_by_aday[aday] + lit->t.nn - 2];
+			if (lit == seen) break;
+			if (!((count + 1) & count)) seen = lit;
+			count++;
 		}
+		if (lit->t.nn) continue;
 		aday = YMD2ADAY(lit->y, lit->m, lit->d);
 		m->t.py = lit->y;
 		m->t.pm = lit->m;
