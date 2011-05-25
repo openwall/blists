@@ -35,6 +35,7 @@ static idx_msgnum_t num_by_aday[N_ADAY + 1];
 
 static idx_msgnum_t msg_num, msg_alloc;
 static struct idx_message *msgs;
+static char *list;
 
 struct mem_message {
 	struct idx_message *msg;
@@ -135,12 +136,14 @@ static int message_process(struct parsed_message *msg)
 		int n = strlen(msg->subject) + 1;
 		if (n > left) {
 			if (left < IDX_SUBJECT_MINGUALEN) {
+				/* extend buffer at the cost of the "From" */
 				int m = IDX_SUBJECT_MINGUALEN;
 				if (m > n) m = n;
 				p -= m - left;
 				*(p - 1) = 0;
 				left = m;
-			}	
+				idx_msg->flags |= IDX_F_FROM_TRUNC;
+			}
 			if (n - left > 1)
 				idx_msg->flags |= IDX_F_SUBJECT_TRUNC;
 			n = left;
@@ -612,6 +615,16 @@ static int mailbox_parse_fd(int fd)
 					p = mime_decode_header(&mime) + 8;
 					while (*p == ' ') p++;
 					msg.subject = p;
+					while ((p = strchr(p, '['))) {
+						char *q;
+						if (strncasecmp(++p, list,
+							    strlen(list)))
+							continue;
+						q = p + strlen(list);
+						if (*q != ']') continue;
+						if (*++q == ' ') q++;
+						memmove(--p, q, strlen(q) + 1);
+					}
 					continue;
 				}
 				break;
@@ -642,12 +655,17 @@ static int mailbox_parse_fd(int fd)
 int mailbox_parse(char *mailbox)
 {
 	int fd, idx_fd;
-	char *idx;
+	char *idx, *p;
 	off_t idx_size;
 	size_t msgs_size;
 	int error;
 	idx_msgnum_t old_msg_num;
 	off_t inc_ofs = 0;
+
+	if ((p = strrchr(mailbox, '/')))
+		list = p + 1;
+	else
+		list = mailbox;
 
 	fd = open(mailbox, O_RDONLY);
 	if (fd < 0) return 1;
