@@ -22,7 +22,7 @@ bindex.o: mailbox.h
 bit.o: params.h html.h
 buffer.o: buffer.h
 mime.o: mime.h buffer.h
-html.o: params.h index.h mime.h buffer.h misc.h
+html.o: params.h index.h mime.h buffer.h misc.h html.h
 mailbox.o: params.h index.h mime.h buffer.h misc.h
 misc.o: params.h
 
