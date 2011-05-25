@@ -14,6 +14,11 @@
 
 #define IDX_F_HAVE_MSGID		1
 #define IDX_F_HAVE_IRT			2
+#define IDX_F_FROM_TRUNC		4
+#define IDX_F_SUBJECT_TRUNC		8
+
+#define IDX_STRINGS_SIZE		160
+#define IDX_SUBJECT_MINGUALEN		120
 
 typedef int idx_msgnum_t;
 typedef off_t idx_off_t;
@@ -32,6 +37,7 @@ struct idx_message {
 	} t;
 	idx_ymd_t y, m, d;
 	idx_flags_t flags;
+	char strings[IDX_STRINGS_SIZE];
 };
 
 #endif

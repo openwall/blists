@@ -6,9 +6,9 @@ CFLAGS = -c -Wall -O2 -fomit-frame-pointer -D_FILE_OFFSET_BITS=64
 LDFLAGS = -s
 
 PROJ = bindex bit
-OBJS_COMMON = misc.o
+OBJS_COMMON = misc.o buffer.o mime.o
 OBJS_BINDEX = bindex.o mailbox.o md5/md5.o
-OBJS_BIT = bit.o html.o buffer.o mime.o
+OBJS_BIT = bit.o html.o
 
 all: $(PROJ)
 
@@ -22,8 +22,8 @@ bindex.o: mailbox.h
 bit.o: params.h html.h
 buffer.o: buffer.h
 mime.o: mime.h buffer.h
-html.o: params.h index.h buffer.h misc.h
-mailbox.o: params.h index.h misc.h
+html.o: params.h index.h mime.h buffer.h misc.h
+mailbox.o: params.h index.h mime.h buffer.h misc.h
 misc.o: params.h
 
 md5/md5.o: md5/md5.c md5/md5.h

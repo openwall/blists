@@ -18,6 +18,8 @@
 
 #include "params.h"
 #include "index.h"
+#include "buffer.h"
+#include "mime.h"
 #include "misc.h"
 #include "mailbox.h"
 
@@ -47,6 +49,7 @@ struct parsed_message {
 	struct tm tm;
 	idx_hash_t msgid_hash, irt_hash;
 	int have_msgid, have_irt;
+	char *from, *subject;
 };
 
 static struct idx_message *msgs_grow(void)
@@ -79,6 +82,8 @@ static struct idx_message *msgs_grow(void)
 static int message_process(struct parsed_message *msg)
 {
 	struct idx_message *idx_msg;
+	char *p;
+	int left;
 
 	idx_msg = msgs_grow();
 	if (!idx_msg) return -1;
@@ -108,6 +113,39 @@ static int message_process(struct parsed_message *msg)
 		memcpy(idx_msg->irt_hash, msg->irt_hash,
 		    sizeof(idx_msg->irt_hash));
 		idx_msg->flags |= IDX_F_HAVE_IRT;
+	}
+
+	p = idx_msg->strings;
+	left = sizeof(idx_msg->strings);
+	if (msg->from) {
+		int n = strlen(msg->from) + 1;
+		if (n > left) {
+			if (n - left > 1)
+				idx_msg->flags |= IDX_F_FROM_TRUNC;
+			n = left;
+		}
+		memcpy(p, msg->from, n);
+		p += n;
+		left -= n;
+	} else {
+		*p++ = 0;
+		left--;
+	}
+	if (msg->subject) {
+		int n = strlen(msg->subject) + 1;
+		if (n > left) {
+			if (left < IDX_SUBJECT_MINGUALEN) {
+				int m = IDX_SUBJECT_MINGUALEN;
+				if (m > n) m = n;
+				p -= m - left;
+				*(p - 1) = 0;
+				left = m;
+			}	
+			if (n - left > 1)
+				idx_msg->flags |= IDX_F_SUBJECT_TRUNC;
+			n = left;
+		}
+		memcpy(p, msg->subject, n);
 	}
 
 	return 0;
@@ -310,6 +348,8 @@ static int mailbox_parse_fd(int fd)
 	struct stat stat;			/* File information */
 	struct parsed_message msg;		/* Message being parsed */
 	MD5_CTX hash;				/* A Message-ID digest */
+	struct buffer premime;			/* Buffered raw headers */
+	struct mime_ctx mime;			/* MIME decoding context */
 	char *file_buffer, *line_buffer;	/* Our internal buffers */
 	off_t file_offset, line_offset;		/* Their offsets in the file */
 	off_t offset;				/* A line fragment's offset */
@@ -335,6 +375,16 @@ static int mailbox_parse_fd(int fd)
 	file_buffer = malloc(FILE_BUFFER_SIZE + LINE_BUFFER_SIZE);
 	if (!file_buffer) return 1;
 	line_buffer = &file_buffer[FILE_BUFFER_SIZE];
+
+	if (buffer_init(&premime, 0)) {
+		free(file_buffer);
+		return 1;
+	}
+	if (mime_init(&mime, &premime)) {
+		buffer_free(&premime);
+		free(file_buffer);
+		return 1;
+	}
 
 	file_offset = line_offset = offset = inc_ofs;	/* Start at inc_ofs, */
 	current = file_buffer; block = 0; saved = 0;	/* and empty buffers */
@@ -447,9 +497,9 @@ static int mailbox_parse_fd(int fd)
 			msg.tm.tm_year = 0;
 			if (line[length - 1] == '\n') {
 				char *p = strchr(line + 5, ' ');
-
 				if (p) {
-					p = strptime(p, " %a %b %d %T %Y", &msg.tm);
+					p = strptime(p, " %a %b %d %T %Y",
+					    &msg.tm);
 					if (!p || *p != '\n')
 						msg.tm.tm_year = 0;
 				}
@@ -459,6 +509,10 @@ static int mailbox_parse_fd(int fd)
 			msg.data_offset = 0;
 			msg.have_msgid = 0;
 			msg.have_irt = 0;
+			msg.from = NULL;
+			msg.subject = NULL;
+			premime.ptr = premime.start;
+			mime.dst.ptr = mime.dst.start;
 			header = 1; body = 0;
 			continue;
 		}
@@ -481,70 +535,106 @@ static int mailbox_parse_fd(int fd)
 			continue;
 		}
 
-/* Blank line ends message headers */
-		if (blank) {
-			header = 0;
-			continue;
-		}
+/* Buffer the headers and the blank line for MIME decoding */
+		buffer_append(&premime, line, length);
 
-		if (start && end)
-		switch (line[0]) {
-		case 'M':
-		case 'm':
-		case 'I':
-		case 'i':
-			if (eq(line, length, "Message-ID:", 11) ||
-			    eq(line, length, "In-Reply-To:", 12)) {
-				char *p = &line[11], *q, *e = line + length;
-				while (p < e && *p != '<') p++;
-				if (p >= e) break;
-				q = ++p;
-				while (q < e && *q != '>') q++;
-				if (q >= e || q - p < 4) break;
-				MD5_Init(&hash);
-				MD5_Update(&hash, p, q - p);
-				if (line[0] == 'M' || line[0] == 'm') {
-					MD5_Final(msg.msgid_hash, &hash);
-					msg.have_msgid = 1;
-				} else {
+/* Blank line ends message headers */
+		if (!blank)
+			continue;
+		header = 0;
+
+/* Now decode MIME */
+		premime.ptr = premime.start;
+		while (premime.ptr < premime.end && *premime.ptr != '\n') {
+			char *p = premime.ptr;
+			int l = premime.end - p, m = 0;
+			switch (*p) {
+			case 'M':
+			case 'm':
+				m = 1;
+			case 'I':
+			case 'i':
+				if (eq(p, l, "Message-ID:", 11) ||
+				    eq(p, l, "In-Reply-To:", 12)) {
+					char *q;
+					p = mime_decode_header(&mime);
+					while (*p && *p != '<') p++;
+					if (!*p) continue;
+					q = ++p;
+					while (*q && *q != '>') q++;
+					if (!*q || q - p < 4) continue;
+					MD5_Init(&hash);
+					MD5_Update(&hash, p, q - p);
+					if (m) {
+						MD5_Final(msg.msgid_hash, &hash);
+						msg.have_msgid = 1;
+					} else {
+						MD5_Final(msg.irt_hash, &hash);
+						msg.have_irt = 1;
+					}
+					continue;
+				}
+				break;
+			case 'R':
+			case 'r':
+				if (!msg.have_irt &&
+				    eq(p, l, "References:", 11)) {
+					char *q;
+					p = mime_decode_header(&mime);
+					while (*p && *p != '<') p++;
+					if (!*p) continue;
+					do {
+						q = ++p;
+						while (*p && *p != '<') p++;
+					} while (*p);
+					p = q;
+					while (*q && *q != '>') q++;
+					if (!*q || q - p < 4) continue;
+					MD5_Init(&hash);
+					MD5_Update(&hash, p, q - p);
 					MD5_Final(msg.irt_hash, &hash);
 					msg.have_irt = 1;
+					continue;
 				}
+				break;
+			case 'F':
+			case 'f':
+				if (eq(p, l, "From:", 5)) {
+					p = mime_decode_header(&mime) + 5;
+					while (*p == ' ') p++;
+					msg.from = p;
+					continue;
+				}
+				break;
+			case 'S':
+			case 's':
+				if (eq(p, l, "Subject:", 8)) {
+					p = mime_decode_header(&mime) + 8;
+					while (*p == ' ') p++;
+					msg.subject = p;
+					continue;
+				}
+				break;
 			}
-			break;
-		case 'R':
-		case 'r':
-			if (!msg.have_irt &&
-			    eq(line, length, "References:", 11)) {
-				char *p = &line[11], *q, *e = line + length;
-				while (p < e && *p != '<') p++;
-				if (p >= e) break;
-				do {
-					q = ++p;
-					while (p < e && *p != '<') p++;
-				} while (p < e);
-				p = q;
-				while (q < e && *q != '>') q++;
-				if (q >= e || q - p < 4) break;
-				MD5_Init(&hash);
-				MD5_Update(&hash, p, q - p);
-				MD5_Final(msg.irt_hash, &hash);
-				msg.have_irt = 1;
-			}
-			break;
+			mime_skip_header(&mime);
 		}
 	} while (1);
 
+	if (premime.error) done = 0;
+	buffer_free(&premime);
 	free(file_buffer);
+
+	if (offset != stat.st_size || !msg.data_offset) done = 0;
 
 	if (done) {
 /* Process the last message */
-		if (offset != stat.st_size) return 1;
-		if (!msg.data_offset) return 1;
 		msg.raw_size = offset - msg.raw_offset;
 		msg.data_size = offset - (blank & body) - msg.data_offset;
-		if (message_process(&msg)) return 1;
+		if (message_process(&msg)) done = 0;
 	}
+
+	if (mime.dst.error) done = 0;
+	mime_free(&mime);
 
 	return !done;
 }
