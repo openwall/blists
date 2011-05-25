@@ -604,7 +604,7 @@ static int mailbox_parse_fd(int fd)
 			case 'f':
 				if (eq(p, l, "From:", 5)) {
 					p = mime_decode_header(&mime) + 5;
-					while (*p == ' ') p++;
+					while (*p == ' ' || *p == '\t') p++;
 					msg.from = p;
 					continue;
 				}
@@ -613,12 +613,12 @@ static int mailbox_parse_fd(int fd)
 			case 's':
 				if (eq(p, l, "Subject:", 8)) {
 					p = mime_decode_header(&mime) + 8;
-					while (*p == ' ') p++;
+					while (*p == ' ' || *p == '\t') p++;
 					msg.subject = p;
 					while ((p = strchr(p, '['))) {
 						char *q;
 						if (strncasecmp(++p, list,
-							    strlen(list)))
+						    strlen(list)))
 							continue;
 						q = p + strlen(list);
 						if (*q != ']') continue;
