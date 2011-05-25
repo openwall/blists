@@ -1,3 +1,8 @@
+/* solar at openwall.com, 2006-2008
+ * abc at openwall.com, 2011
+ */
+
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -13,6 +18,10 @@
 #include "html.h"
 
 int html_flags = HTML_BODY;
+char *month_name[] = {
+	"January", "February", "March", "April", "May", "June",
+	"July", "August", "September", "October", "November", "December"
+};
 
 /*
  * Checks if the hostname ending just before end belongs to domain.
@@ -259,8 +268,7 @@ int html_message(char *list,
 		return html_error((error || m1 > 0) ? NULL : "No such message");
 	}
 	m1r = m1 + n - (1 + 1); /* both m1 and n are 1-based; m1r is 0-based */
-	idx_offset = (N_ADAY + 1) * sizeof(idx_msgnum_t) +
-	    m1r * sizeof(idx_msg[1]);
+	idx_offset = IDX2IDX(m1r);
 	prev = next = 1;
 	if (m1r >= 1) {
 		idx_offset -= sizeof(idx_msg[0]);
@@ -337,7 +345,7 @@ int html_message(char *list,
 	if (fd < 0) {
 		buffer_free(&dst);
 		buffer_free(&src);
-		return html_error(NULL);
+		return html_error("mbox open error");
 	}
 	error =
 	    lseek(fd, offset, SEEK_SET) != offset ||
@@ -345,7 +353,7 @@ int html_message(char *list,
 	if (close(fd) || error || mime_init(&mime, &src)) {
 		buffer_free(&dst);
 		buffer_free(&src);
-		return html_error(NULL);
+		return html_error("mbox read error");
 	}
 
 	date = from = to = cc = subject = body = NULL;
@@ -455,7 +463,8 @@ int html_message(char *list,
 			    idx_msg[1].t.nn);
 		}
 		buffer_appends(&dst,
-		    "<a href=\"..\">[month]</a>"
+		    "<a href=\".\">[day]</a>"
+		    " <a href=\"..\">[month]</a>"
 		    " <a href=\"../..\">[year]</a>"
 		    " <a href=\"../../..\">[list]</a>\n");
 
@@ -528,6 +537,180 @@ int html_message(char *list,
 	return 0;
 }
 
+/* output From and Subject strings */
+static void output_strings(struct buffer *dst, struct idx_message *m,
+    int close_a)
+{
+	char *from, *subj;
+	int from_len, subj_len;
+
+	from = m->strings;
+	from_len = strnlen(from, sizeof(m->strings));
+
+	subj = m->strings + from_len + 1;
+	if (from_len + 1 < sizeof(m->strings)) {
+		subj_len = strnlen(subj, sizeof(m->strings) - from_len - 1);
+	} else
+		subj_len = 0;
+
+	if (subj_len) {
+		buffer_append_html(dst, subj, subj_len);
+		if (m->flags & IDX_F_SUBJECT_TRUNC)
+			buffer_appends(dst, "&hellip;");
+	} else
+		buffer_appends(dst, "(no subject)");
+	if (close_a)
+		buffer_appends(dst, "</a>");
+	buffer_appends(dst, " (");
+	buffer_append_html(dst, from, from_len);
+	if (m->flags & IDX_F_FROM_TRUNC)
+		buffer_appends(dst, "&hellip;");
+	buffer_appends(dst, ")");
+}
+
+int html_day_index(char *list, unsigned int y, unsigned int m, unsigned int d)
+{
+	unsigned int aday;
+	char *idx_file;
+	off_t idx_offset;
+	off_t size, size_n;
+	int fd, error, got;
+	idx_msgnum_t mx[2]; /* today, next day */
+	struct buffer dst;
+	struct idx_message *mp;
+	int prev; /* have prev message = 1 */
+	int count; /* how many messages in this month */
+	int next; /* flag & index to next message */
+
+	if (y < MIN_YEAR || y > MAX_YEAR ||
+	    m < 1 || m > 12 ||
+	    d < 1 || d > 31)
+		return html_error("Invalid date");
+	aday = YMD2ADAY(y - MIN_YEAR, m, d);
+
+	idx_file = concat(MAIL_SPOOL_PATH "/", list,
+	    INDEX_FILENAME_SUFFIX, NULL);
+	if (!idx_file)
+		return html_error(NULL);
+
+	fd = open(idx_file, O_RDONLY);
+	error = errno;
+	free(idx_file);
+	if (fd < 0)
+		return html_error(error == ENOENT ?
+		    "No such mailing list" : NULL);
+	/* read two consecutive aday entries
+	 * will need them to determine message count for this day */
+	idx_offset = aday * sizeof(idx_msgnum_t);
+	error =
+	    lock_fd(fd, 1) ||
+	    lseek(fd, idx_offset, SEEK_SET) != idx_offset ||
+	    read_loop(fd, &mx, sizeof(mx)) != sizeof(mx);
+	if (error || mx[0] < 1 || mx[0] >= MAX_MAILBOX_MESSAGES) {
+		unlock_fd(fd);
+		close(fd);
+		return html_error((error || mx[0] > 0) ? NULL : "No messages"
+		    " for this day");
+	}
+	if (mx[1] > 0)
+		count = mx[1] - mx[0];
+	else
+		count = -mx[1];
+	size = count * sizeof(struct idx_message);
+	idx_offset = IDX2IDX(mx[0] - 1);
+	if (mx[0] > 1) {
+	       	/* read one more entry for Prev day quick link */
+		size += sizeof(struct idx_message);
+		idx_offset -= sizeof(struct idx_message);
+		prev = 1;
+	} else
+		prev = 0;
+
+	/* read one more entry for Next day quick link */
+	size_n = size + sizeof(struct idx_message);
+
+	error = !(mp = malloc(size_n)) ||
+	       	lseek(fd, idx_offset, SEEK_SET) != idx_offset;
+	got = error ? -1 :
+	    read_loop(fd, mp, size_n);
+	if (got != size && got != size_n) {
+		unlock_fd(fd);
+		close(fd);
+		if (mp) free(mp);
+		return html_error("Index error");
+	}
+	next = (got == size_n) ? count + prev : 0;
+
+	if (unlock_fd(fd)) error = 1;
+	if (close(fd) || error || buffer_init(&dst, 0)) {
+		free(mp);
+		return html_error(NULL);
+	}
+
+	buffer_appends(&dst, "\n");
+
+	if (html_flags & HTML_HEADER) {
+		buffer_appends(&dst, "<title>");
+		buffer_appends_html(&dst, list);
+		buffer_appendf(&dst, " mailing list - %u/%02u/%02u</title>\n",
+		    y, m, d);
+	}
+
+	if (html_flags & HTML_BODY) {
+		int i;
+		if (prev) {
+			buffer_appends(&dst, "<a href=\"");
+			buffer_appendf(&dst,
+			       "../../../%u/%02u/%02u/\">[&lt;prev day]</a> ",
+			       MIN_YEAR + mp[0].y,
+			       mp[0].m, mp[0].d);
+		}
+		if (next) {
+			buffer_appends(&dst, "<a href=\"");
+			buffer_appendf(&dst,
+			       "../../../%u/%02u/%02u/\">[next day&gt;]</a> ",
+			       MIN_YEAR + mp[next].y,
+			       mp[next].m, mp[next].d);
+		}
+		buffer_appends(&dst,
+		    "<a href=\"..\">[month]</a>"
+		    " <a href=\"../..\">[year]</a>"
+		    " <a href=\"../../..\">[list]</a>\n");
+
+		buffer_appends(&dst, "<p><h2>");
+		buffer_appends_html(&dst, list);
+		buffer_appendf(&dst, " mailing list - %u/%02u/%02u</h2>\n",
+		    y, m, d);
+
+		if (count)
+			buffer_appends(&dst, "<ul>\n");
+		for (i = 0; i < count; i++) {
+			struct idx_message *msg = mp + i + prev;
+
+			buffer_appendf(&dst, "<li><a href=\"%u\">", i + 1);
+			output_strings(&dst, msg, 1);
+			buffer_appends(&dst, "\n");
+		}
+		if (count)
+			buffer_appends(&dst, "</ul>\n");
+
+		buffer_appendf(&dst, "<p>%u message%s\n",
+			       count, count == 1 ? "" : "s");
+	}
+
+	free(mp);
+	if (dst.error) {
+		buffer_free(&dst);
+		return html_error(NULL);
+	}
+
+	write_loop(STDOUT_FILENO, dst.start, dst.ptr - dst.start);
+
+	buffer_free(&dst);
+
+	return 0;
+}
+
 int html_month_index(char *list, unsigned int y, unsigned int m)
 {
 	unsigned int d, n, aday, dp;
@@ -536,6 +719,12 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 	int fd, error;
 	idx_msgnum_t mn[32], mp, count, total;
 	struct buffer dst;
+	int first; /* first message of this month */
+	off_t size, size_n;
+	struct idx_message *msgp = NULL, *msg = NULL;
+	int prev = 0;
+	int next = 0;
+
 
 	if (y < MIN_YEAR || y > MAX_YEAR ||
 	    m < 1 || m > 12)
@@ -555,10 +744,62 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 		    "No such mailing list" : NULL);
 
 	idx_offset = aday * sizeof(idx_msgnum_t);
-	error =
-	    lock_fd(fd, 1) ||
+	if (lock_fd(fd, 1) ||
 	    lseek(fd, idx_offset, SEEK_SET) != idx_offset ||
-	    read_loop(fd, mn, sizeof(mn)) != sizeof(mn);
+	    read_loop(fd, mn, sizeof(mn)) != sizeof(mn)) {
+		unlock_fd(fd);
+		close(fd);
+		return html_error("Index error");
+	}
+
+	/* quickly calculate how many messages we have in this month */
+	total = 0;
+	first = 0;
+	mp = mn[0];
+	for (d = 1; d <= 31; d++) {
+		if (!mn[d]) continue;
+		if (mp > 0) {
+			if (first == 0) first = mp; /* remember index
+						       of first message */
+			count = (mn[d] > 0) ? mn[d] - mp : -mn[d];
+			if (count <= 0) {
+				buffer_free(&dst);
+				unlock_fd(fd);
+				close(fd);
+				return html_error(NULL);
+			}
+			total += count;
+		}
+		mp = mn[d];
+	}
+	/* have messages, allocate and read them */
+	if (total && first) {
+		off_t got;
+
+		first--;
+		size = total * sizeof(struct idx_message);
+		idx_offset = IDX2IDX(first);
+		/* we need to read prev and next messages too */
+		if (first) {
+			size += sizeof(struct idx_message);
+			idx_offset -= sizeof(struct idx_message);
+			prev = 1;
+		}
+		size_n = size + sizeof(struct idx_message);
+
+		if (!(msgp = malloc(size_n)) ||
+		    lseek(fd, idx_offset, SEEK_SET) != idx_offset ||
+		    (got = read_loop(fd, msgp, size_n)) == -1 ||
+			(got != size && got != size_n)) {
+			unlock_fd(fd);
+			close(fd);
+			if (msgp) free(msgp);
+			return html_error("Index error");
+		}
+		msg = msgp + prev;
+		next = (got == size_n) ? total + prev : 0;
+	}
+
 	if (unlock_fd(fd)) error = 1;
 	if (close(fd) || error || buffer_init(&dst, 0))
 		return html_error(NULL);
@@ -572,6 +813,20 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 	}
 
 	if (html_flags & HTML_BODY) {
+		if (prev) {
+			buffer_appends(&dst, "<a href=\"");
+			buffer_appendf(&dst,
+			    "../../%u/%02u/\">[&lt;prev month]</a> ",
+			    MIN_YEAR + msgp[0].y, msgp[0].m);
+
+		}
+		if (next) {
+			buffer_appends(&dst, "<a href=\"");
+			buffer_appendf(&dst,
+			    "../../%u/%02u/\">[next month&gt;]</a> ",
+			    MIN_YEAR + msgp[next].y, msgp[next].m);
+
+		}
 		buffer_appends(&dst,
 		    "<a href=\"..\">[year]</a>"
 		    " <a href=\"../..\">[list]</a>\n");
@@ -579,6 +834,11 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 		buffer_appends(&dst, "<p><h2>");
 		buffer_appends_html(&dst, list);
 		buffer_appendf(&dst, " mailing list - %u/%02u</h2>\n", y, m);
+
+		if (!total || !msg) {
+			buffer_free(&dst);
+			return html_error("No messages for this day.");
+		}
 
 		total = 0;
 		dp = 0;
@@ -598,13 +858,33 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 					buffer_appends(&dst,
 					    "<p>Messages by day:\n<p>\n");
 				total += count;
-				if (count > 999) count = 999;
-				buffer_appendf(&dst, "<b>%u</b>:", dp + 1);
-				for (n = 1; n <= count; n++)
+
+				buffer_appendf(&dst, "<b>%s %u</b> "
+				    "(<a href=\"%02u/\">%u message%s</a>)<br>\n"
+				    "<ul>\n",
+				    month_name[m - 1], dp + 1,
+				    dp + 1, count, count == 1 ? "" : "s");
+
+				int maxn = count;
+				if (count >= MAX_SHORT_MSG_LIST)
+					maxn = MAX_SHORT_MSG_LIST;
+				if (count > MAX_SHORT_MSG_LIST)
+					maxn--;
+
+				for (n = 1; n <= maxn; n++) {
 					buffer_appendf(&dst,
-					    " <a href=\"%02u/%u\">%u</a>",
-					    dp + 1, n, n);
-				buffer_appends(&dst, "<br>\n");
+					    "<li><a href=\"%02u/%u\">",
+					    dp + 1, n);
+					output_strings(&dst, msg++, 1);
+					buffer_appends(&dst, "\n");
+				}
+				msg += count - maxn;
+				if (count > MAX_SHORT_MSG_LIST)
+					buffer_appendf(&dst, "<li>"
+					    "<a href=\"%02u/\">"
+					    "%u more messages"
+					    "</a>\n", d, count - maxn);
+				buffer_appends(&dst, "</ul>\n");
 			}
 			mp = mn[d];
 			dp = d;
@@ -617,6 +897,7 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 			buffer_appends(&dst, "<p>No messages\n");
 	}
 
+	if (msgp) free(msgp);
 	if (dst.error) {
 		buffer_free(&dst);
 		return html_error(NULL);
@@ -670,10 +951,53 @@ int html_year_index(char *list, unsigned int y)
 	}
 
 	idx_offset = aday * sizeof(idx_msgnum_t);
-	error =
-	    lock_fd(fd, 1) ||
+	if (lock_fd(fd, 1) ||
 	    (idx_offset && lseek(fd, idx_offset, SEEK_SET) != idx_offset) ||
-	    read_loop(fd, mn, mn_size) != mn_size;
+	    read_loop(fd, mn, mn_size) != mn_size) {
+		unlock_fd(fd);
+		close(fd);
+		free(mn);
+		return html_error(NULL);
+	}
+
+	/* find first and next index for Prev and Next year links */
+	int first = 0;
+	int lastn = 0;
+	rday = YMD2ADAY(min_y - MIN_YEAR, 1, 1) - aday;
+	unsigned int eday = YMD2ADAY(max_y - MIN_YEAR + 1, 1, 1) - aday;
+	for (; rday < eday; rday++)
+		if (mn[rday] > 0) {
+			if (!first)
+				first = mn[rday];
+			if (mn[rday + 1] <= 0)
+				lastn = mn[rday] + -mn[rday + 1];
+			else
+				lastn = mn[rday + 1];
+		}
+	int prev = 0;
+	int next = 0;
+	if (first || lastn) {
+		struct idx_message msg;
+		off_t size = sizeof(struct idx_message);
+		if (first > 1) {
+			idx_offset = IDX2IDX(first - 2);
+			if (lseek(fd, idx_offset, SEEK_SET) != idx_offset ||
+			    read_loop(fd, &msg, size) != size) {
+				unlock_fd(fd);
+				close(fd);
+				free(mn);
+				return html_error("Index error");
+			}
+			prev = MIN_YEAR + msg.y;
+		}
+		if (lastn > 1) {
+			idx_offset = IDX2IDX(lastn);
+			if (lseek(fd, idx_offset, SEEK_SET) == idx_offset &&
+			    read_loop(fd, &msg, size) == size)
+				next = MIN_YEAR + msg.y;
+		}
+	}
+
 	if (unlock_fd(fd)) error = 1;
 	if (close(fd) || error || buffer_init(&dst, 0)) {
 		free(mn);
@@ -692,6 +1016,14 @@ int html_year_index(char *list, unsigned int y)
 	}
 
 	if (html_flags & HTML_BODY) {
+		if (prev) {
+			buffer_appendf(&dst, "<a href=\"../%u/\">[prev year]</a>\n",
+			    prev);
+		}
+		if (next) {
+			buffer_appendf(&dst, "<a href=\"../%u/\">[next year]</a>\n",
+			    next);
+		}
 		if (min_y == max_y)
 			buffer_appends(&dst, "<a href=\"..\">[list]</a>\n");
 
@@ -701,6 +1033,79 @@ int html_year_index(char *list, unsigned int y)
 		if (min_y == max_y)
 			buffer_appendf(&dst, " - %u", y);
 		buffer_appends(&dst, "</h2>\n");
+
+
+		/* output short year-o-month index */
+		int o_header = 0;
+		int o_year = 0;
+		int o_month = -1;
+		for (y = max_y; y >= min_y; y--) {
+			rday = YMD2ADAY(y - MIN_YEAR, 1, 1) - aday;
+			for (m = 1; m <= 12; m++) {
+				monthly_total = 0;
+				for (d = 1; d <= 31; d++, rday++) {
+					if (mn[rday] <= 0) continue;
+					if (mn[rday + 1] > 0)
+						count = mn[rday + 1] - mn[rday];
+					else
+						count = -mn[rday + 1];
+					if (count <= 0) {
+						buffer_free(&dst);
+						free(mn);
+						return html_error(NULL);
+					}
+					monthly_total += count;
+				}
+				if (!monthly_total)
+					continue;
+				if (!o_header) {
+					buffer_appends(&dst,
+					    "\n<table border=0 "
+					    "class=calendar><tr><th>"
+					    "<th>Jan<th>Feb<th>Mar"
+					    "<th>Apr<th>May<th>Jun"
+					    "<th>Jul<th>Aug<th>Sep"
+					    "<th>Oct<th>Nov<th>Dec\n");
+
+					o_header++;
+				}
+				if (o_year != y) {
+					if (o_month >= 0)
+						for (o_month++; o_month <= 12;
+						    o_month++)
+							buffer_appends(&dst,
+							    "<td class=ccell>"
+							    "&nbsp;");
+					buffer_appendf(&dst, "\n<tr><td>");
+					if (min_y != max_y)
+						buffer_appendf(&dst,
+						    "<a href=\"%u/\">", y);
+					buffer_appendf(&dst, "<b>%4u</b>", y);
+					if (min_y != max_y)
+						buffer_appends(&dst, "</a>");
+					o_year = y;
+					o_month = 0;
+				}
+				for (o_month++; o_month < m; o_month++)
+					buffer_appends(&dst, "<td class=ccell>"
+					    "&nbsp;");
+				buffer_appendf(&dst, "<td class=ccell>"
+				    "<a href=\"");
+				if (min_y != max_y)
+					buffer_appendf(&dst, "%u/", y);
+				buffer_appendf(&dst, "%02u/\">%u</a>",
+				    m, monthly_total);
+				o_month = m;
+
+			}
+		}
+		if (o_header) {
+			if (o_year)
+				for (o_month++; o_month <= 12; o_month++)
+					buffer_appends(&dst, "<td class=ccell>"
+					    "&nbsp;");
+			buffer_appends(&dst, "\n</table>\n");
+		}
 
 		total = 0;
 		rday = (max_y - min_y + 1) * (12 * 31) + (31 + 1);

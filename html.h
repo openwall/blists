@@ -5,6 +5,8 @@
 #define HTML_BODY			2
 #define HTML_CENSOR			4
 
+#define MAX_SHORT_MSG_LIST		10
+
 /* Header vs. body */
 extern int html_flags;
 
@@ -21,6 +23,12 @@ extern int html_error(char *msg);
  */
 extern int html_message(char *list,
 	unsigned int y, unsigned int m, unsigned int d, unsigned int n);
+
+/*
+ * Outputs the message index for the specified day to stdout.
+ */
+extern int html_day_index(char *list, unsigned int y, unsigned int m,
+	unsigned int d);
 
 /*
  * Outputs the message index for the specified month to stdout.

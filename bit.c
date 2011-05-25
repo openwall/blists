@@ -44,6 +44,10 @@ int main(int argc, char **argv)
 	if (sscanf(p, "%u/%u/%u/%u%c", &y, &m, &d, &n, &nul) >= 4 && !nul)
 		return html_message(list, y, m, d, n);
 
+	if (sscanf(p, "%u/%u/%u%c%c", &y, &m, &d, &slash, &nul) >= 4 &&
+	    slash == '/' && !nul)
+		return html_day_index(list, y, m, d);
+
 	if (sscanf(p, "%u/%u%c%c", &y, &m, &slash, &nul) >= 3 &&
 	    slash == '/' && !nul)
 		return html_month_index(list, y, m);

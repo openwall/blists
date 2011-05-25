@@ -11,6 +11,9 @@
 	(((unsigned int)(y) * 12 + \
 	((unsigned int)(m) - 1)) * 31 + \
 	((unsigned int)(d) - 1))
+#define IDX2IDX(a) \
+	((N_ADAY + 1) * sizeof(idx_msgnum_t) + \
+	(a) * sizeof(struct idx_message))
 
 #define IDX_F_HAVE_MSGID		1
 #define IDX_F_HAVE_IRT			2
