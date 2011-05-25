@@ -18,7 +18,8 @@
 #include "html.h"
 
 int html_flags = HTML_BODY;
-char *month_name[] = {
+
+static char *month_name[] = {
 	"January", "February", "March", "April", "May", "June",
 	"July", "August", "September", "October", "November", "December"
 };
@@ -619,7 +620,7 @@ int html_day_index(char *list, unsigned int y, unsigned int m, unsigned int d)
 	size = count * sizeof(struct idx_message);
 	idx_offset = IDX2IDX(mx[0] - 1);
 	if (mx[0] > 1) {
-	       	/* read one more entry for Prev day quick link */
+		/* read one more entry for Prev day quick link */
 		size += sizeof(struct idx_message);
 		idx_offset -= sizeof(struct idx_message);
 		prev = 1;
@@ -630,7 +631,7 @@ int html_day_index(char *list, unsigned int y, unsigned int m, unsigned int d)
 	size_n = size + sizeof(struct idx_message);
 
 	error = !(mp = malloc(size_n)) ||
-	       	lseek(fd, idx_offset, SEEK_SET) != idx_offset;
+		lseek(fd, idx_offset, SEEK_SET) != idx_offset;
 	got = error ? -1 :
 	    read_loop(fd, mp, size_n);
 	if (got != size && got != size_n) {
@@ -661,16 +662,16 @@ int html_day_index(char *list, unsigned int y, unsigned int m, unsigned int d)
 		if (prev) {
 			buffer_appends(&dst, "<a href=\"");
 			buffer_appendf(&dst,
-			       "../../../%u/%02u/%02u/\">[&lt;prev day]</a> ",
-			       MIN_YEAR + mp[0].y,
-			       mp[0].m, mp[0].d);
+			    "../../../%u/%02u/%02u/\">[&lt;prev day]</a> ",
+			    MIN_YEAR + mp[0].y,
+			    mp[0].m, mp[0].d);
 		}
 		if (next) {
 			buffer_appends(&dst, "<a href=\"");
 			buffer_appendf(&dst,
-			       "../../../%u/%02u/%02u/\">[next day&gt;]</a> ",
-			       MIN_YEAR + mp[next].y,
-			       mp[next].m, mp[next].d);
+			    "../../../%u/%02u/%02u/\">[next day&gt;]</a> ",
+			    MIN_YEAR + mp[next].y,
+			    mp[next].m, mp[next].d);
 		}
 		buffer_appends(&dst,
 		    "<a href=\"..\">[month]</a>"
@@ -695,7 +696,7 @@ int html_day_index(char *list, unsigned int y, unsigned int m, unsigned int d)
 			buffer_appends(&dst, "</ul>\n");
 
 		buffer_appendf(&dst, "<p>%u message%s\n",
-			       count, count == 1 ? "" : "s");
+		    count, count == 1 ? "" : "s");
 	}
 
 	free(mp);
@@ -722,9 +723,7 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 	int first; /* first message of this month */
 	off_t size, size_n;
 	struct idx_message *msgp = NULL, *msg = NULL;
-	int prev = 0;
-	int next = 0;
-
+	int prev = 0, next = 0;
 
 	if (y < MIN_YEAR || y > MAX_YEAR ||
 	    m < 1 || m > 12)
@@ -759,8 +758,9 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 	for (d = 1; d <= 31; d++) {
 		if (!mn[d]) continue;
 		if (mp > 0) {
-			if (first == 0) first = mp; /* remember index
-						       of first message */
+			/* Remember index of first message */
+			if (first == 0)
+				first = mp;
 			count = (mn[d] > 0) ? mn[d] - mp : -mn[d];
 			if (count <= 0) {
 				buffer_free(&dst);
@@ -1017,12 +1017,12 @@ int html_year_index(char *list, unsigned int y)
 
 	if (html_flags & HTML_BODY) {
 		if (prev) {
-			buffer_appendf(&dst, "<a href=\"../%u/\">[prev year]</a>\n",
-			    prev);
+			buffer_appendf(&dst,
+			    "<a href=\"../%u/\">[prev year]</a>\n", prev);
 		}
 		if (next) {
-			buffer_appendf(&dst, "<a href=\"../%u/\">[next year]</a>\n",
-			    next);
+			buffer_appendf(&dst,
+			    "<a href=\"../%u/\">[next year]</a>\n", next);
 		}
 		if (min_y == max_y)
 			buffer_appends(&dst, "<a href=\"..\">[list]</a>\n");
