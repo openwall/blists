@@ -1,8 +1,17 @@
 /*
  * MIME message parsing.
  *
- * Written by Solar Designer <solar at openwall.com> in 2006, and placed
- * in the public domain.  There's absolutely no warranty.
+ * Written by Solar Designer <solar at openwall.com> in 2006.
+ * No copyright is claimed, and the software is hereby placed in the public
+ * domain.  In case this attempt to disclaim copyright and place the software
+ * in the public domain is deemed null and void, then the software is
+ * Copyright (c) 2006 Solar Designer and it is hereby released to the
+ * general public under the following terms:
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted.
+ *
+ * There's ABSOLUTELY NO WARRANTY, express or implied.
  */
 
 #ifndef _BLISTS_MIME_H
