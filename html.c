@@ -25,6 +25,11 @@
 
 int html_flags = HTML_BODY;
 
+/* Please don't remove this (although you may) */
+static char *footer =
+	"<p><a href=\"http://www.openwall.com/blists/\">Powered by blists</a>"
+	" - <a href=\"http://lists.openwall.net\">more mailing lists</a>\n";
+
 static char *month_name[] = {
 	"January", "February", "March", "April", "May", "June",
 	"July", "August", "September", "October", "November", "December"
@@ -71,6 +76,11 @@ static char *detect_url(char *what, char *colon, char *end,
 		ptr--;
 	if (ptr <= hostname) return NULL;
 
+/*
+ * We add rel="nofollow" on links to URLs except in safe domains (those
+ * where we expect to be no pages that a spammer would want to promote).
+ * Yes, these are hard-coded for now.  Feel free to edit.
+ */
 	*safe = match_domain(hostname, ptr, "openwall.com") ||
 		match_domain(hostname, ptr, "openwall.net") ||
 		match_domain(hostname, ptr, "openwall.org") ||
@@ -217,12 +227,28 @@ int html_error(char *msg)
 		    "<meta name=\"robots\" content=\"noindex\">\n", NULL);
 	else
 		msg = concat("\n<p>The request has failed: ", msg,
-		    ".\n", NULL);
+		    ".\n", footer, NULL);
 
 	write_loop(STDOUT_FILENO, msg, strlen(msg));
 	free(msg);
 
 	return 1;
+}
+
+static int html_send(struct buffer *dst)
+{
+	if (html_flags & HTML_BODY)
+		buffer_appends(dst, footer);
+
+	if (dst->error) {
+		buffer_free(dst);
+		return html_error(NULL);
+	}
+
+	write_loop(STDOUT_FILENO, dst->start, dst->ptr - dst->start);
+	buffer_free(dst);
+
+	return 0;
 }
 
 int html_message(char *list,
@@ -537,11 +563,7 @@ int html_message(char *list,
 
 	mime_free(&mime);
 
-	write_loop(STDOUT_FILENO, dst.start, dst.ptr - dst.start);
-
-	buffer_free(&dst);
-
-	return 0;
+	return html_send(&dst);
 }
 
 /* output From and Subject strings */
@@ -706,16 +728,8 @@ int html_day_index(char *list, unsigned int y, unsigned int m, unsigned int d)
 	}
 
 	free(mp);
-	if (dst.error) {
-		buffer_free(&dst);
-		return html_error(NULL);
-	}
 
-	write_loop(STDOUT_FILENO, dst.start, dst.ptr - dst.start);
-
-	buffer_free(&dst);
-
-	return 0;
+	return html_send(&dst);
 }
 
 int html_month_index(char *list, unsigned int y, unsigned int m)
@@ -904,16 +918,8 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 	}
 
 	if (msgp) free(msgp);
-	if (dst.error) {
-		buffer_free(&dst);
-		return html_error(NULL);
-	}
 
-	write_loop(STDOUT_FILENO, dst.start, dst.ptr - dst.start);
-
-	buffer_free(&dst);
-
-	return 0;
+	return html_send(&dst);
 }
 
 int html_year_index(char *list, unsigned int y)
@@ -1177,14 +1183,5 @@ int html_year_index(char *list, unsigned int y)
 			buffer_appends(&dst, "<p>No messages\n");
 	}
 
-	if (dst.error) {
-		buffer_free(&dst);
-		return html_error(NULL);
-	}
-
-	write_loop(STDOUT_FILENO, dst.start, dst.ptr - dst.start);
-
-	buffer_free(&dst);
-
-	return 0;
+	return html_send(&dst);
 }
