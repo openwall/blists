@@ -1,5 +1,12 @@
 /*
- * Mailbox access.
+ * Initial mbox file parsing.
+ *
+ * Copyright (c) 2006 Solar Designer <solar at openwall.com>
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted.
+ *
+ * There's ABSOLUTELY NO WARRANTY, express or implied.
  */
 
 #ifndef _BLISTS_MAILBOX_H

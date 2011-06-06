@@ -1,5 +1,11 @@
-/* solar at openwall.com, 2006-2008
- * abc at openwall.com, 2011
+/*
+ * Copyright (c) 2006,2008,2009 Solar Designer <solar at openwall.com>
+ * Copyright (c) 2011 ABC <abc at openwall.com>
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted.
+ *
+ * There's ABSOLUTELY NO WARRANTY, express or implied.
  */
 
 #define _GNU_SOURCE

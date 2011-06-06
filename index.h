@@ -1,3 +1,13 @@
+/*
+ * Copyright (c) 2006,2011 Solar Designer <solar at openwall.com>
+ * Copyright (c) 2011 ABC <abc at openwall.com>
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted.
+ *
+ * There's ABSOLUTELY NO WARRANTY, express or implied.
+ */
+
 #ifndef _BLISTS_INDEX_H
 #define _BLISTS_INDEX_H
 

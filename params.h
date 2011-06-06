@@ -1,3 +1,12 @@
+/*
+ * Copyright (c) 2006,2008,2009 Solar Designer <solar at openwall.com>
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted.
+ *
+ * There's ABSOLUTELY NO WARRANTY, express or implied.
+ */
+
 #ifndef _BLISTS_PARAMS_H
 #define _BLISTS_PARAMS_H
 

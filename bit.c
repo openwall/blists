@@ -1,3 +1,13 @@
+/*
+ * Copyright (c) 2006,2008 Solar Designer <solar at openwall.com>
+ * Copyright (c) 2011 ABC <abc at openwall.com>
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted.
+ *
+ * There's ABSOLUTELY NO WARRANTY, express or implied.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

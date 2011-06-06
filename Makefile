@@ -1,3 +1,12 @@
+#
+# Copyright (c) 2006,2008,2011 Solar Designer
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted.
+#
+# There's ABSOLUTELY NO WARRANTY, express or implied.
+#
+
 CC = gcc
 LD = $(CC)
 RM = rm -f
