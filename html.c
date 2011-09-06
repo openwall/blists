@@ -192,7 +192,7 @@ static void buffer_append_html_generic(struct buffer *dst, char *what,
 		case '\r':
 			break;
 		default:
-			if ((c >= 0x20 && c <= 0x7e) || c >= 0xa0)
+			if (c >= 0x20)
 				buffer_appendc(dst, c);
 			else
 				buffer_appendc(dst, '.');
