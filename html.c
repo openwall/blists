@@ -1010,6 +1010,38 @@ int html_year_index(char *list, unsigned int y)
 		}
 	}
 
+	/* read Recent messages */
+	struct idx_message *msg = NULL;
+	int recent_count = 0;
+	int i;
+	if (min_y != max_y && lastn > 1) {
+		int recent_offset = 0;
+		recent_count = MAX_RECENT_MSG_LIST;
+		if ((lastn - 1) < recent_count)
+			recent_count = lastn - 1;
+		size_t size = recent_count * sizeof(struct idx_message);
+		recent_offset = lastn - recent_count;
+		idx_offset = IDX2IDX(recent_offset - 1);
+		if (!(msg = malloc(size)) ||
+		    lseek(fd, idx_offset, SEEK_SET) != idx_offset ||
+		    (read_loop(fd, msg, size) != size))
+			recent_count = 0;
+
+		/* resolve to message number in the day and cache in offset field */
+		rday = YMD2ADAY(min_y - MIN_YEAR, 1, 1) - aday;
+		i = 0;
+		for (; rday < eday; rday++)
+			if (mn[rday] > 0 && recent_offset >= mn[rday]) {
+				count = aday_count(&mn[rday]);
+				while (recent_offset < (mn[rday] + count)) {
+					msg[i].offset = recent_offset - mn[rday] + 1;
+					recent_offset++;
+					i++;
+					if (i > recent_count)
+						break;
+				}
+			}
+	}
 	if (unlock_fd(fd)) error = 1;
 	if (close(fd) || error || buffer_init(&dst, 0)) {
 		free(mn);
@@ -1121,7 +1153,23 @@ int html_year_index(char *list, unsigned int y)
 			buffer_appends(&dst, "\n</table>\n");
 		}
 
+		/* here insert Recent messages */
+		if (msg && recent_count) {
+			buffer_appends(&dst, "<br>Recent messages:<br>\n<ul>\n");
+			for (i = recent_count - 1; i >= 0; i--) {
+				buffer_appendf(&dst,
+				    "<li>%04u/%02u/%02u #%u: <a href=\"%04u/%02u/%02u/%u\">\n",
+				    msg[i].y + MIN_YEAR, msg[i].m, msg[i].d, (int)msg[i].offset,
+				    msg[i].y + MIN_YEAR, msg[i].m, msg[i].d, (int)msg[i].offset);
+				output_strings(&dst, &msg[i], 1);
+				buffer_appends(&dst, "\n");
+			}
+			buffer_appends(&dst, "</ul>\n");
+		}
+
 		free(mn);
+		if (msg)
+			free(msg);
 
 		if (total)
 			buffer_appendf(&dst, "<p>%u message%s\n",

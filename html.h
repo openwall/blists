@@ -16,6 +16,7 @@
 #define HTML_CENSOR			4
 
 #define MAX_SHORT_MSG_LIST		10
+#define MAX_RECENT_MSG_LIST		10
 
 /* Header vs. body */
 extern int html_flags;

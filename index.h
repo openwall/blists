@@ -53,4 +53,16 @@ struct idx_message {
 	char strings[IDX_STRINGS_SIZE];
 };
 
+/* return number of messages in this day */
+inline int aday_count(const idx_msgnum_t *mn) {
+	if (mn[0] < 1)
+		return 0;
+	else {
+		if (mn[1] < 0)
+			return -mn[1];
+		else
+			return mn[1] - mn[0];
+	}
+}
+
 #endif
