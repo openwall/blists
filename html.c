@@ -924,11 +924,11 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 
 int html_year_index(char *list, unsigned int y)
 {
-	unsigned int min_y, max_y, m, d, d1, aday, rday;
+	unsigned int min_y, max_y, m, d, aday, rday;
 	char *idx_file;
 	off_t idx_offset;
 	int fd, error;
-	idx_msgnum_t *mn, mp, count, monthly_total, yearly_total, total;
+	idx_msgnum_t *mn, count, monthly_total, total;
 	size_t mn_size;
 	struct buffer dst;
 
@@ -1047,6 +1047,7 @@ int html_year_index(char *list, unsigned int y)
 		buffer_appends(&dst, "</h2>\n");
 
 
+		total = 0;
 		/* output short year-o-month index */
 		int o_header = 0;
 		int o_year = 0;
@@ -1109,6 +1110,7 @@ int html_year_index(char *list, unsigned int y)
 				    m, monthly_total);
 				o_month = m;
 
+				total += monthly_total;
 			}
 		}
 		if (o_header) {
@@ -1117,61 +1119,6 @@ int html_year_index(char *list, unsigned int y)
 					buffer_appends(&dst, "<td class=ccell>"
 					    "&nbsp;");
 			buffer_appends(&dst, "\n</table>\n");
-		}
-
-		total = 0;
-		rday = (max_y - min_y + 1) * (12 * 31) + (31 + 1);
-		for (y = max_y; y >= min_y; y--) {
-			yearly_total = 0;
-			for (m = 12; m >= 1; m--) {
-				d1 = 0; /* never used */
-				monthly_total = 0;
-				rday -= 2 * 31;
-				mp = mn[rday - 1];
-				for (d = 1; d <= 31; d++, rday++) {
-					if (!mn[rday]) continue;
-					if (mp > 0) {
-						if (mn[rday] > 0)
-							count = mn[rday] - mp;
-						else
-							count = -mn[rday];
-						if (count <= 0) {
-							buffer_free(&dst);
-							free(mn);
-							return html_error(NULL);
-						}
-						d1 = d;
-						monthly_total += count;
-					}
-					mp = mn[rday];
-				}
-				if (monthly_total) {
-					if (!total && !yearly_total)
-						buffer_appends(&dst,
-						    "<p>Messages by month:\n"
-						    "<p>\n");
-					yearly_total += monthly_total;
-					buffer_appends(&dst, "<a href=\"");
-					if (min_y != max_y)
-						buffer_appendf(&dst, "%u/", y);
-					buffer_appendf(&dst,
-					    "%02u/\">%u/%02u</a>: ",
-					    m, y, m);
-					if (monthly_total != 1) {
-						buffer_appendf(&dst,
-						    "%u messages<br>\n",
-						    monthly_total);
-						continue;
-					}
-					buffer_appends(&dst, "<a href=\"");
-					if (min_y != max_y)
-						buffer_appendf(&dst, "%u/", y);
-					buffer_appendf(&dst,
-					    "%02u/%02u/1\">1 message</a><br>\n",
-					    m, d1);
-				}
-			}
-			total += yearly_total;
 		}
 
 		free(mn);
