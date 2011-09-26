@@ -1148,7 +1148,7 @@ int html_year_index(char *list, unsigned int y)
 			buffer_appends(&dst, "\n</table>\n");
 		}
 
-		/* here insert Recent messages */
+		/* output Recent messages */
 		if (msg && recent_count) {
 			buffer_appends(&dst, "<br>Recent messages:<br>\n<ul>\n");
 			for (i = recent_count - 1; i >= 0; i--) {
