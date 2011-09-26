@@ -977,6 +977,7 @@ int html_year_index(char *list, unsigned int y)
 	int lastn = 0;
 	rday = YMD2ADAY(min_y - MIN_YEAR, 1, 1) - aday;
 	unsigned int eday = YMD2ADAY(max_y - MIN_YEAR + 1, 1, 1) - aday;
+	int sanity = 0;
 	for (; rday < eday; rday++)
 		if (mn[rday] > 0) {
 			if (!first)
@@ -985,6 +986,14 @@ int html_year_index(char *list, unsigned int y)
 				lastn = mn[rday] + -mn[rday + 1];
 			else
 				lastn = mn[rday + 1];
+			/* sanity check of index */
+			if (lastn <= mn[rday] ||
+			    ((mn[rday] != sanity) && sanity)) {
+				buffer_free(&dst);
+				free(mn);
+				return html_error("Index corrupt");
+			}
+			sanity = lastn;
 		}
 	int prev = 0;
 	int next = 0;
