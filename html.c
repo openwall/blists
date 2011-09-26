@@ -1094,11 +1094,6 @@ int html_year_index(char *list, unsigned int y)
 						count = mn[rday + 1] - mn[rday];
 					else
 						count = -mn[rday + 1];
-					if (count <= 0) {
-						buffer_free(&dst);
-						free(mn);
-						return html_error(NULL);
-					}
 					monthly_total += count;
 				}
 				if (!monthly_total)
