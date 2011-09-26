@@ -54,6 +54,7 @@ int mime_init(struct mime_ctx *ctx, struct buffer *src)
 	return 0;
 }
 
+/* free all entities up to specified */
 static void free_entities_to(struct mime_ctx *ctx, struct mime_entity *end)
 {
 	struct mime_entity *entity;
@@ -71,6 +72,8 @@ void mime_free(struct mime_ctx *ctx)
 	buffer_free(&ctx->dst);
 }
 
+/* eat one header out of src, multi-line if need,
+ * return pointer to it */
 char *mime_skip_header(struct mime_ctx *ctx)
 {
 	char *p, *q, *end;
@@ -103,6 +106,11 @@ char *mime_skip_header(struct mime_ctx *ctx)
 	return p;
 }
 
+/* Content-Transfer-Encoding: {7bit,8bit,quoted-printable,base64} */
+/* Content-Type: text/plain; charset="us-ascii"; delsp=yes; format=flowed */
+/* Content-Type: multipart/mixed; boundary="xxxxxxxxxxxxxxxx" */
+
+/* process header field with mime meaning */
 static void process_header(struct mime_ctx *ctx, char *header)
 {
 	struct mime_entity *entity;
@@ -151,6 +159,7 @@ static void process_header(struct mime_ctx *ctx, char *header)
 	} while (1);
 }
 
+/* from `encoded' to `dst' */
 static void decode_qp(struct buffer *dst, char *encoded, size_t length,
     int header)
 {
@@ -193,6 +202,7 @@ static void decode_qp(struct buffer *dst, char *encoded, size_t length,
 	}
 }
 
+/* from `encoded' to `dst' */
 static void decode_base64(struct buffer *dst, char *encoded, size_t length)
 {
 	unsigned char c, *p, *end;
@@ -246,6 +256,7 @@ static void decode_base64(struct buffer *dst, char *encoded, size_t length)
 	}
 }
 
+/* decode mime-encoded-words, ex: =?charset?encoding?encoded text?= */
 static void decode_header(struct buffer *dst, char *header, size_t length)
 {
 	char *done, *p, *q, *end, *charset, *encoding;
@@ -281,6 +292,7 @@ static void decode_header(struct buffer *dst, char *header, size_t length)
 	buffer_append(dst, done, end - done);
 }
 
+/* get(src), decode, and parse one header field (can be multi-line), put(dst) */
 char *mime_decode_header(struct mime_ctx *ctx)
 {
 	char *header;
@@ -309,6 +321,7 @@ char *mime_decode_header(struct mime_ctx *ctx)
 	return header;
 }
 
+/* find boundary separator, return pointer to it, or `end', or NULL(error) */
 static char *find_next_boundary(struct mime_ctx *ctx, int pre)
 {
 	struct mime_entity *entity;
@@ -339,6 +352,7 @@ static char *find_next_boundary(struct mime_ctx *ctx, int pre)
 					continue;
 				if (length + 2 <= end - p &&
 				    p[length] == '-' && p[length + 1] == '-') {
+					/* terminating */
 					free_entities_to(ctx, entity->next);
 					if (pre)
 						return ctx->src->ptr = p - 2;
@@ -360,11 +374,13 @@ static char *find_next_boundary(struct mime_ctx *ctx, int pre)
 	return end;
 }
 
+/* find next mime part */
 char *mime_next_body_part(struct mime_ctx *ctx)
 {
 	return find_next_boundary(ctx, 0);
 }
 
+/* parse headers of current mime part and return pointer to it's body */
 char *mime_next_body(struct mime_ctx *ctx)
 {
 	while (ctx->src->ptr < ctx->src->end) {
@@ -382,6 +398,7 @@ char *mime_next_body(struct mime_ctx *ctx)
 	return ctx->src->ptr;
 }
 
+/* don't parse this mime body */
 char *mime_skip_body(struct mime_ctx *ctx)
 {
 /* Forget the last non-multipart content type processed */
@@ -391,6 +408,7 @@ char *mime_skip_body(struct mime_ctx *ctx)
 	return find_next_boundary(ctx, 1);
 }
 
+/* don't skip this mime body */
 char *mime_decode_body(struct mime_ctx *ctx)
 {
 	char *body, *bend, *encoding;
