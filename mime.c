@@ -380,7 +380,7 @@ char *mime_next_body_part(struct mime_ctx *ctx)
 	return find_next_boundary(ctx, 0);
 }
 
-/* parse headers of current mime part and return pointer to it's body */
+/* parse headers of current mime part and return pointer to its body */
 char *mime_next_body(struct mime_ctx *ctx)
 {
 	while (ctx->src->ptr < ctx->src->end) {
