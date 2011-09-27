@@ -16,6 +16,8 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <assert.h>
+#include <iconv.h>
 
 #include "buffer.h"
 #include "mime.h"
@@ -32,6 +34,7 @@ static int new_entity(struct mime_ctx *ctx)
 	entity->type = "text/plain";
 	entity->boundary = NULL;
 	entity->encoding = NULL;
+	entity->charset = NULL;
 	ctx->entities = entity;
 	ctx->depth++;
 
@@ -45,9 +48,11 @@ int mime_init(struct mime_ctx *ctx, struct buffer *src)
 	ctx->src = src;
 
 	if (buffer_init(&ctx->dst, src->end - src->ptr)) return -1;
+	if (buffer_init(&ctx->enc, ICONV_BUF_SIZE)) return -1;
 
 	if (new_entity(ctx)) {
 		buffer_free(&ctx->dst);
+		buffer_free(&ctx->enc);
 		return -1;
 	}
 
@@ -152,10 +157,12 @@ static void process_header(struct mime_ctx *ctx, char *header)
 			v = p;
 		while (*p && *p != ';') p++;
 		if (*p) *p++ = '\0';
-		if (!strcasecmp(a, "boundary")) {
+		if (!strcasecmp(a, "boundary"))
 			entity->boundary = v;
+		else if (!strcasecmp(a, "charset"))
+			entity->charset = v;
+		if (entity->boundary && entity->charset)
 			return;
-		}
 	} while (1);
 }
 
@@ -256,10 +263,58 @@ static void decode_base64(struct buffer *dst, char *encoded, size_t length)
 	}
 }
 
+/* convert text from `enc' buffer to `dst' by `charset' (non-const) */
+static void to_main_charset(struct buffer *dst, struct buffer *enc, char *charset)
+{
+	char *iptr = enc->start;
+	size_t inlen = enc->ptr - enc->start;
+	char *p;
+
+	/* sanitize charset string */
+	p = charset;
+	while ((*p >= 'a' && *p <= 'z') ||
+	    (*p >= 'A' && *p <= 'Z') ||
+	    (*p >= '0' && *p <= '9') ||
+	    (*p == '-'))
+		p++;
+	if (*p == '?')
+		*p = 0;
+	else
+		charset = UNKNOWN_CHARSET;
+
+	if (!strcasecmp(MAIN_CHARSET, charset))
+		buffer_append(dst, iptr, inlen);
+	else {
+		iconv_t cd = iconv_open(MAIN_CHARSET, charset);
+		char out[ICONV_BUF_SIZE];
+
+		if (cd == (iconv_t)(-1))
+			cd = iconv_open(MAIN_CHARSET, UNKNOWN_CHARSET);
+		assert(cd != (iconv_t)(-1));
+		do {
+			char *optr = out;
+			size_t outlen = sizeof(out);
+			int e = iconv(cd, &iptr, &inlen, &optr, &outlen);
+			buffer_append(dst, out, optr - out);
+			if (inlen == 0)
+				break;
+			if (e == -1) {
+				buffer_appendc(dst, '?');
+				iptr++;
+				inlen--;
+			}
+		} while ((int)inlen > 0);
+		iconv_close(cd);
+	}
+
+	enc->ptr = enc->start;
+}
+
 /* decode mime-encoded-words, ex: =?charset?encoding?encoded text?= */
-static void decode_header(struct buffer *dst, char *header, size_t length)
+static void decode_header(struct mime_ctx *ctx, char *header, size_t length)
 {
 	char *done, *p, *q, *end, *charset, *encoding;
+	struct buffer *dst = &ctx->dst;
 
 	done = p = header;
 	end = header + length;
@@ -280,11 +335,13 @@ static void decode_header(struct buffer *dst, char *header, size_t length)
 		if (*q != '=') continue;
 		buffer_append(dst, done, --p - done);
 		done = ++q;
-		if (*encoding == 'Q' || *encoding == 'q')
-			decode_qp(dst, encoding + 2, q - encoding - 4, 1);
-		else if (*encoding == 'B' || *encoding == 'b')
-			decode_base64(dst, encoding + 2, q - encoding - 4);
-		else
+		if (*encoding == 'Q' || *encoding == 'q') {
+			decode_qp(&ctx->enc, encoding + 2, q - encoding - 4, 1);
+			to_main_charset(dst, &ctx->enc, charset);
+		} else if (*encoding == 'B' || *encoding == 'b') {
+			decode_base64(&ctx->enc, encoding + 2, q - encoding - 4);
+			to_main_charset(dst, &ctx->enc, charset);
+		} else
 			done = p++;
 		p = done;
 	}
@@ -308,7 +365,7 @@ char *mime_decode_header(struct mime_ctx *ctx)
 
 	dst_offset = ctx->dst.ptr - ctx->dst.start;
 
-	decode_header(&ctx->dst, header, length);
+	decode_header(ctx, header, length);
 	buffer_append(&ctx->dst, "", 1);
 	if (ctx->dst.error)
 		return NULL;

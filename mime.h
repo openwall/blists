@@ -20,14 +20,18 @@
 #include "buffer.h"
 
 #define MIME_DEPTH_MAX			10
+#define ICONV_BUF_SIZE			512
+#define MAIN_CHARSET			"UTF-8"
+#define DEFAULT_CHARSET			"latin1"
+#define UNKNOWN_CHARSET			"latin1"
 
 struct mime_entity {
 	struct mime_entity *next;
-	char *type, *boundary, *encoding;
+	char *type, *boundary, *encoding, *charset;
 };
 
 struct mime_ctx {
-	struct buffer *src, dst;
+	struct buffer *src, dst, enc;
 	struct mime_entity *entities;
 	int depth;
 };
