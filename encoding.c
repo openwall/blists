@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <iconv.h>
+#include <errno.h>
 
 #include "buffer.h"
 #include "encoding.h"
@@ -67,11 +68,14 @@ static int whitelisted_charset(const char *charset)
 }
 
 /* convert text from `enc' buffer to `dst' by `charset' (non-const) */
-void to_main_charset(struct buffer *dst, struct buffer *enc, char *charset)
+void encoding_to_utf8(struct buffer *dst, struct buffer *enc, char *charset)
 {
 	char *iptr = enc->start;
 	size_t inlen = enc->ptr - enc->start;
 	char *p;
+
+	if (!charset)
+		charset = UNKNOWN_CHARSET;
 
 	/* sanitize charset string */
 	p = charset;
@@ -82,28 +86,32 @@ void to_main_charset(struct buffer *dst, struct buffer *enc, char *charset)
 		p++;
 	if (*p == '?')
 		*p = 0;
-	else
+	if (*p)
 		charset = UNKNOWN_CHARSET;
 
-	if (!strcasecmp(MAIN_CHARSET, charset) ||
+	if (!strcasecmp(UTF8_CHARSET, charset) ||
 	    !whitelisted_charset(charset))
 		buffer_append(dst, iptr, inlen);
 	else {
-		iconv_t cd = iconv_open(MAIN_CHARSET, charset);
+		iconv_t cd = iconv_open(UTF8_CHARSET, charset);
 		char out[ICONV_BUF_SIZE];
 
 		if (cd == (iconv_t)(-1))
-			cd = iconv_open(MAIN_CHARSET, UNKNOWN_CHARSET);
+			cd = iconv_open(UTF8_CHARSET, UNKNOWN_CHARSET);
 		assert(cd != (iconv_t)(-1));
 		do {
 			char *optr = out;
 			size_t outlen = sizeof(out);
 			int e = iconv(cd, &iptr, &inlen, &optr, &outlen);
 			buffer_append(dst, out, optr - out);
-			if (inlen == 0)
-				break;
-			if (e == -1) {
-				buffer_appendc(dst, '?');
+			/* if output buffer is full (errno == E2BIG) we
+			 * will just continue processing (it will be
+			 * resumed on next iteration, because iconv()
+			 * also updates iptr and inlen), otherwise
+			 * report conversion error with REPLACEMENT
+			 * CHARACTER (U+FFFD), which looks like <?>. */
+			if (e == -1 && errno != E2BIG) {
+				buffer_appenduc(dst, 0xFFFD);
 				iptr++;
 				inlen--;
 			}

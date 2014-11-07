@@ -80,6 +80,27 @@ int buffer_appendc(struct buffer *buf, char what)
 	return 0;
 }
 
+/* append utf-8 char */
+void buffer_appenduc(struct buffer *buf, unsigned int what)
+{
+	if (what <= 0x007f)
+		buffer_appendc(buf, what);
+	else if (what <= 0x07ff) {
+		buffer_appendc(buf, 0xc0 |  (what >> 6));
+		buffer_appendc(buf, 0x80 |  (what        & 0x3f));
+	} else if (what <= 0xffff) {
+		buffer_appendc(buf, 0xe0 |  (what >> 12));
+		buffer_appendc(buf, 0x80 | ((what >> 6)  & 0x3f));
+		buffer_appendc(buf, 0x80 |  (what        & 0x3f));
+	} else if (what <= 0x10ffff) {
+		buffer_appendc(buf, 0xf0 |  (what >> 18));
+		buffer_appendc(buf, 0x80 | ((what >> 12) & 0x3f));
+		buffer_appendc(buf, 0x80 | ((what >> 6)  & 0x3f));
+		buffer_appendc(buf, 0x80 |  (what        & 0x3f));
+	} else
+		buffer_appenduc(buf, 0xfffd); /* replacement character */
+}
+
 int buffer_appendf(struct buffer *buf, char *fmt, ...)
 {
 	va_list args;

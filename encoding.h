@@ -14,11 +14,11 @@
 
 #include "buffer.h"
 
-#define ICONV_BUF_SIZE			512
-#define MAIN_CHARSET			"UTF-8"
+#define ICONV_BUF_SIZE			1024
+#define UTF8_CHARSET			"UTF-8"
 #define DEFAULT_CHARSET			"latin1"
 #define UNKNOWN_CHARSET			"latin1"
 
-extern void to_main_charset(struct buffer *dst, struct buffer *enc, char *charset);
+extern void encoding_to_utf8(struct buffer *dst, struct buffer *enc, char *charset);
 
 #endif

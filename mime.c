@@ -119,6 +119,7 @@ static void process_header(struct mime_ctx *ctx, char *header)
 {
 	struct mime_entity *entity;
 	char *p, *a, *v;
+	int multipart = 0;
 
 	if (!strncasecmp(header, "Content-Transfer-Encoding:", 26)) {
 		p = header + 26;
@@ -139,7 +140,8 @@ static void process_header(struct mime_ctx *ctx, char *header)
 	if (!*p) return;
 
 	*p++ = '\0';
-	if (strncasecmp(entity->type, "multipart/", 10)) return;
+	if (!strncasecmp(entity->type, "multipart/", 10))
+		multipart++;
 
 	do {
 		while (*p == ' ' || *p == '\t' || *p == '\n') p++;
@@ -156,7 +158,7 @@ static void process_header(struct mime_ctx *ctx, char *header)
 			v = p;
 		while (*p && *p != ';') p++;
 		if (*p) *p++ = '\0';
-		if (!strcasecmp(a, "boundary"))
+		if (multipart && !strcasecmp(a, "boundary"))
 			entity->boundary = v;
 		else if (!strcasecmp(a, "charset"))
 			entity->charset = v;
@@ -289,10 +291,10 @@ static void decode_header(struct mime_ctx *ctx, char *header, size_t length)
 		done = ++q;
 		if (*encoding == 'Q' || *encoding == 'q') {
 			decode_qp(&ctx->enc, encoding + 2, q - encoding - 4, 1);
-			to_main_charset(dst, &ctx->enc, charset);
+			encoding_to_utf8(dst, &ctx->enc, charset);
 		} else if (*encoding == 'B' || *encoding == 'b') {
 			decode_base64(&ctx->enc, encoding + 2, q - encoding - 4);
-			to_main_charset(dst, &ctx->enc, charset);
+			encoding_to_utf8(dst, &ctx->enc, charset);
 		} else
 			done = p++;
 		p = done;
@@ -420,10 +422,11 @@ char *mime_skip_body(struct mime_ctx *ctx)
 /* don't skip this mime body */
 char *mime_decode_body(struct mime_ctx *ctx)
 {
-	char *body, *bend, *encoding;
+	char *body, *bend, *encoding, *charset;
 	size_t length, dst_offset;
 
 	encoding = ctx->entities->encoding;
+	charset = ctx->entities->charset;
 
 	body = ctx->src->ptr;
 	bend = mime_skip_body(ctx);
@@ -435,11 +438,12 @@ char *mime_decode_body(struct mime_ctx *ctx)
 	dst_offset = ctx->dst.ptr - ctx->dst.start;
 
 	if (encoding && !strcasecmp(encoding, "quoted-printable"))
-		decode_qp(&ctx->dst, body, length, 0);
+		decode_qp(&ctx->enc, body, length, 0);
 	else if (encoding && !strcasecmp(encoding, "base64"))
-		decode_base64(&ctx->dst, body, length);
+		decode_base64(&ctx->enc, body, length);
 	else
-		buffer_append(&ctx->dst, body, length);
+		buffer_append(&ctx->enc, body, length);
+	encoding_to_utf8(&ctx->dst, &ctx->enc, charset);
 	if (ctx->dst.error)
 		return NULL;
 
