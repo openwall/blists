@@ -22,6 +22,7 @@
 #include "mime.h"
 #include "misc.h"
 #include "html.h"
+#include "encoding.h"
 
 int html_flags = HTML_BODY;
 
@@ -572,6 +573,7 @@ static void output_strings(struct buffer *dst, struct idx_message *m,
 {
 	char *from, *subj;
 	int from_len, subj_len;
+	int trunc;
 
 	from = m->strings;
 	from_len = strnlen(from, sizeof(m->strings));
@@ -583,16 +585,20 @@ static void output_strings(struct buffer *dst, struct idx_message *m,
 		subj_len = 0;
 
 	if (subj_len) {
+		trunc = (m->flags & IDX_F_SUBJECT_TRUNC) ||
+			utf8_remove_trailing_partial_character(subj, &subj_len);
 		buffer_append_html(dst, subj, subj_len);
-		if (m->flags & IDX_F_SUBJECT_TRUNC)
+		if (trunc)
 			buffer_appends(dst, "&hellip;");
 	} else
 		buffer_appends(dst, "(no subject)");
 	if (close_a)
 		buffer_appends(dst, "</a>");
 	buffer_appends(dst, " (");
+	trunc = (m->flags & IDX_F_FROM_TRUNC) ||
+		utf8_remove_trailing_partial_character(from, &from_len);
 	buffer_append_html(dst, from, from_len);
-	if (m->flags & IDX_F_FROM_TRUNC)
+	if (trunc)
 		buffer_appends(dst, "&hellip;");
 	buffer_appends(dst, ")");
 }

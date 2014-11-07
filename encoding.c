@@ -122,3 +122,31 @@ void encoding_to_utf8(struct buffer *dst, struct buffer *enc, char *charset)
 	enc->ptr = enc->start;
 }
 
+/* remove partial utf8 character from string by reducing its len */
+/* return how many bytes are removed, *lenp is modified to reflect new
+ * length */
+int utf8_remove_trailing_partial_character(char *ptr, int *lenp)
+{
+	int len;
+
+	for (len = *lenp; len; ) {
+		int s_size = 1; /* sequence size */
+		unsigned char ch = *ptr;
+
+		if (ch >= 0xf3)
+			/* illegal multi-byte sequence */;
+		else if (ch >= 0xf0)
+			s_size = 4;
+		else if (ch >= 0xe0)
+			s_size = 3;
+		else if (ch >= 0xc0)
+			s_size = 2;
+		if (len < s_size)
+			break;
+		len -= s_size;
+		ptr += s_size;
+	}
+
+	*lenp -= len;
+	return len;
+}
