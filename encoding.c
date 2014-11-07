@@ -17,7 +17,7 @@
 #include "buffer.h"
 #include "encoding.h"
 
-static char *charset_whitelist[] = {
+static const char *charset_whitelist[] = {
 	"us-ascii$",
 	"iso",
 	"utf-7",
@@ -58,7 +58,7 @@ static int match_charset(const char *charset, const char *mask)
 
 static int whitelisted_charset(const char *charset)
 {
-	char **p;
+	const char **p;
 
 	for (p = charset_whitelist; *p; p++)
 		if (match_charset(charset, *p))
