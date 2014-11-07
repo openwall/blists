@@ -17,6 +17,55 @@
 #include "buffer.h"
 #include "encoding.h"
 
+static char *charset_whitelist[] = {
+	"us-ascii$",
+	"iso",
+	"utf-7",
+	"koi8-r$",
+	"koi8-u$",
+	"windows-",
+	"cp",
+	"utf-8",
+	NULL
+};
+
+static int simple_tolower(char ch)
+{
+	if (ch >= 'A' && ch <= 'Z')
+		return ch + 'a' - 'A';
+	return ch;
+}
+
+static int match_charset(const char *charset, const char *mask)
+{
+	int i;
+
+	for (; *mask; mask++, charset++) {
+		if (*mask == '$')
+			return !*charset;
+		if (*mask != simple_tolower(*charset))
+			return 0;
+	}
+	/* allow eight chars of digits and dashes */
+	for (i = 0; *charset && i < 8; i++, charset++) {
+		char ch = *charset;
+
+		if (!((ch >= '0' && ch <= '9') || ch == '-'))
+			return 0;
+	}
+	return !*charset;
+}
+
+static int whitelisted_charset(const char *charset)
+{
+	char **p;
+
+	for (p = charset_whitelist; *p; p++)
+		if (match_charset(charset, *p))
+			return 1;
+	return 0;
+}
+
 /* convert text from `enc' buffer to `dst' by `charset' (non-const) */
 void to_main_charset(struct buffer *dst, struct buffer *enc, char *charset)
 {
@@ -36,7 +85,8 @@ void to_main_charset(struct buffer *dst, struct buffer *enc, char *charset)
 	else
 		charset = UNKNOWN_CHARSET;
 
-	if (!strcasecmp(MAIN_CHARSET, charset))
+	if (!strcasecmp(MAIN_CHARSET, charset) ||
+	    !whitelisted_charset(charset))
 		buffer_append(dst, iptr, inlen);
 	else {
 		iconv_t cd = iconv_open(MAIN_CHARSET, charset);
