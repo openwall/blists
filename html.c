@@ -827,8 +827,10 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 	}
 
 	if (unlock_fd(fd)) error = 1;
-	if (close(fd) || error || buffer_init(&dst, 0))
+	if (close(fd) || error || buffer_init(&dst, 0)) {
+		free(msgp);
 		return html_error(NULL);
+	}
 
 	buffer_appends(&dst, "\n");
 
@@ -863,6 +865,7 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 
 		if (!total || !msg) {
 			buffer_free(&dst);
+			free(msgp);
 			return html_error("No messages for this day.");
 		}
 
@@ -878,6 +881,7 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 					count = -mn[d];
 				if (count <= 0) {
 					buffer_free(&dst);
+					free(msgp);
 					return html_error(NULL);
 				}
 				if (!total)
@@ -1059,6 +1063,7 @@ int html_year_index(char *list, unsigned int y)
 	}
 	if (unlock_fd(fd)) error = 1;
 	if (close(fd) || error || buffer_init(&dst, 0)) {
+		free(msg);
 		free(mn);
 		return html_error(NULL);
 	}
@@ -1177,8 +1182,8 @@ int html_year_index(char *list, unsigned int y)
 			buffer_appends(&dst, "</ul>\n");
 		}
 
-		free(mn);
-		free(msg);
+		free(msg); msg = NULL;
+		free(mn); mn = NULL;
 
 		if (total)
 			buffer_appendf(&dst, "<p>%u message%s\n",
@@ -1186,6 +1191,9 @@ int html_year_index(char *list, unsigned int y)
 		else
 			buffer_appends(&dst, "<p>No messages\n");
 	}
+
+	free(msg);
+	free(mn);
 
 	return html_send(&dst);
 }
