@@ -671,7 +671,7 @@ int html_day_index(char *list, unsigned int y, unsigned int m, unsigned int d)
 	if (got != size && got != size_n) {
 		unlock_fd(fd);
 		close(fd);
-		if (mp) free(mp);
+		free(mp);
 		return html_error("Index error");
 	}
 	next = (got == size_n) ? count + prev : 0;
@@ -819,7 +819,7 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 			(got != size && got != size_n)) {
 			unlock_fd(fd);
 			close(fd);
-			if (msgp) free(msgp);
+			free(msgp);
 			return html_error("Index error");
 		}
 		msg = msgp + prev;
@@ -923,7 +923,7 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 			buffer_appends(&dst, "<p>No messages\n");
 	}
 
-	if (msgp) free(msgp);
+	free(msgp);
 
 	return html_send(&dst);
 }
@@ -1178,8 +1178,7 @@ int html_year_index(char *list, unsigned int y)
 		}
 
 		free(mn);
-		if (msg)
-			free(msg);
+		free(msg);
 
 		if (total)
 			buffer_appendf(&dst, "<p>%u message%s\n",

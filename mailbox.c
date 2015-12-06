@@ -342,7 +342,7 @@ static off_t begin_inc_idx(int idx_fd, int fd)
 		}
 	}
 	if (error) {
-		if (msgs) free(msgs);
+		free(msgs);
 		return 0;
 	}
 
