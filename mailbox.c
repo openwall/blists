@@ -508,7 +508,7 @@ static int mailbox_parse_fd(int fd)
 			}
 			msg.tm.tm_year = 0;
 			if (line[length - 1] == '\n') {
-				char *p = strchr(line + 5, ' ');
+				char *p = memchr(line + 5, ' ', length - 5);
 				if (p) {
 					p = strptime(p, " %a %b %d %T %Y",
 					    &msg.tm);
