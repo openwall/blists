@@ -157,7 +157,8 @@ static int message_process(struct parsed_message *msg)
 				idx_msg->flags |= IDX_F_SUBJECT_TRUNC;
 			n = left;
 		}
-		memcpy(p, msg->subject, n);
+		if (n)
+			memcpy(p, msg->subject, n);
 	}
 
 	return 0;
