@@ -564,6 +564,7 @@ static int mailbox_parse_fd(int fd)
 			case 'M':
 			case 'm':
 				m = 1;
+				/* FALLTHRU */
 			case 'I':
 			case 'i':
 				if (eq(p, l, "Message-ID:", 11) ||
