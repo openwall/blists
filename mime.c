@@ -264,7 +264,52 @@ static void decode_base64(struct buffer *dst, char *encoded, size_t length)
 	}
 }
 
-/* decode mime-encoded-words, ex: =?charset?encoding?encoded text?= */
+static inline int istokenchar(char ch)
+{
+	/* rfc2047#section-2 token */
+	switch (ch) {
+		/* SPACE */
+		case ' ':
+		/* CTLs */
+		case '\0' ... '\037':
+		case '\177':
+		/* especials */
+		case '(':
+		case ')':
+		case ',':
+		case '.':
+		case '/':
+		case ':' ... '@': /* :;<=>?@ */
+		case '[':
+		case ']':
+			return 0;
+		default:
+			return 1;
+	}
+}
+static inline int isencodedchar(unsigned char ch)
+{
+	/* rfc2047#section-2 encoded-text */
+	if (ch < 33 || ch > 126 || /* non-printable ASCII */
+	    ch == '?')
+		return 0;
+	return 1;
+}
+
+static inline int islinearwhitespace(char ch)
+{
+	switch (ch) {
+		case ' ':
+		case '\t':
+		case '\r':
+		case '\n':
+			return 1;
+		default:
+			return 0;
+	}
+}
+
+/* decode mime-encoded-words, ex: =?charset?encoding?encoded_text?= */
 static void decode_header(struct mime_ctx *ctx, char *header, size_t length)
 {
 	char *done, *p, *q, *end, *charset, *encoding;
@@ -274,20 +319,29 @@ static void decode_header(struct mime_ctx *ctx, char *header, size_t length)
 	end = header + length;
 
 	while (p < end) {
+		char *r;
+
 		if (*p++ != '=') continue;
 		if (p >= end) break;
 		if (*p != '?') continue;
 		q = p;
 		charset = ++q;
-		while (q < end && *q++ != '?');
+		for (; q < end && istokenchar(*q); q++);
+		if (*q++ != '?') continue;
 		if (q >= end) continue;
+		if (!istokenchar(*q)) continue;
 		encoding = q++;
 		if (q >= end) continue;
 		if (*q++ != '?') continue;
-		while (q < end && *q++ != '?');
+		for (; q < end && isencodedchar(*q); q++);
+		if (*q++ != '?') continue;
 		if (q >= end) continue;
 		if (*q != '=') continue;
-		buffer_append(dst, done, --p - done);
+		/* skip adjacent linear-white-space between previous encoded-word */
+		r = --p - 1;
+		if (done != header)
+			for (; r >= done && islinearwhitespace(*r); r--);
+		buffer_append(dst, done, r + 1 - done);
 		done = ++q;
 		if (*encoding == 'Q' || *encoding == 'q') {
 			decode_qp(&ctx->enc, encoding + 2, q - encoding - 4, 1);
@@ -295,8 +349,7 @@ static void decode_header(struct mime_ctx *ctx, char *header, size_t length)
 		} else if (*encoding == 'B' || *encoding == 'b') {
 			decode_base64(&ctx->enc, encoding + 2, q - encoding - 4);
 			encoding_to_utf8(dst, &ctx->enc, charset);
-		} else
-			done = p++;
+		}
 		p = done;
 	}
 
