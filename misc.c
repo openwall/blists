@@ -18,14 +18,49 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <string.h>
+#include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <limits.h>
 #include <errno.h>
 #include <sys/time.h>
 #include <sys/file.h>
+#include <time.h>
 
 #include "params.h"
+
+void logtty(const char *fmt, ...)
+{
+	va_list args;
+	static int tty = -1;
+
+	if (tty == -1)
+		tty = isatty(2);
+	if (!tty)
+		return;
+
+	va_start(args, fmt);
+	vfprintf(stderr, fmt, args);
+	va_end(args);
+	fflush(stderr);
+}
+
+void log_percentage(off_t offset, off_t size)
+{
+	static time_t last_ts = 0;
+	static off_t last_offset = 0;
+	time_t now;
+
+	if ((offset - last_offset) < 1000000)
+		return;
+	now = time(NULL);
+	if (last_ts && (now - last_ts) < 1)
+		return;
+	last_offset = offset;
+	last_ts = now;
+	logtty(" %6.2f%%\r", (double)offset / (double)size * (double)100.0);
+	fflush(stdout);
+}
 
 /*
  * A select(2)-based sleep() equivalent: no more problems with SIGALRM,
@@ -49,6 +84,7 @@ int lock_fd(int fd, int shared)
 	memset(&l, 0, sizeof(l));
 	l.l_whence = SEEK_SET;
 	l.l_type = shared ? F_RDLCK : F_WRLCK;
+	logtty("Waiting for the lock...\n");
 	while (fcntl(fd, F_SETLKW, &l)) {
 		if (errno != EBUSY) return -1;
 		sleep_select(1, 0);
@@ -56,6 +92,7 @@ int lock_fd(int fd, int shared)
 #endif
 
 #if LOCK_FLOCK
+	logtty("Waiting for the lock...\n");
 	while (flock(fd, shared ? LOCK_SH : LOCK_EX)) {
 		if (errno != EBUSY) return -1;
 		sleep_select(1, 0);

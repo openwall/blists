@@ -45,4 +45,8 @@ extern int write_loop(int fd, const void *buffer, int count);
  */
 extern char *concat(const char *s1, ...);
 
+/* fprintf on stderr but only if it is a tty */
+extern void logtty(const char *fmt, ...);
+extern void log_percentage(off_t offset, off_t size);
+
 #endif

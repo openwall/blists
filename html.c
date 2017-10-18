@@ -282,19 +282,20 @@ int html_message(char *list,
 		return html_error(NULL);
 	}
 
-	fd = open(idx_file, O_RDONLY);
+	fd = idx_open(idx_file);
 	error = errno;
 	free(idx_file);
 	if (fd < 0) {
 		free(list_file);
 		return html_error(error == ENOENT ?
-		    "No such mailing list" : NULL);
+		    "No such mailing list" : (error == ESRCH ?
+		    "Index needs rebuild" : NULL));
 	}
 
 	idx_offset = aday * sizeof(idx_msgnum_t);
 	error =
 	    lock_fd(fd, 1) ||
-	    lseek(fd, idx_offset, SEEK_SET) != idx_offset ||
+	    idx_lseek(fd, idx_offset, SEEK_SET) != idx_offset ||
 	    read_loop(fd, &m1, sizeof(m1)) != sizeof(m1);
 	if (error || m1 < 1 || m1 >= MAX_MAILBOX_MESSAGES) {
 		close(fd);
@@ -306,7 +307,7 @@ int html_message(char *list,
 	prev = next = 1;
 	if (m1r >= 1) {
 		idx_offset -= sizeof(idx_msg[0]);
-		error = lseek(fd, idx_offset, SEEK_SET) != idx_offset;
+		error = idx_lseek(fd, idx_offset, SEEK_SET) != idx_offset;
 		got = error ? -1 :
 		    read_loop(fd, &idx_msg, sizeof(idx_msg));
 		if (got != sizeof(idx_msg)) {
@@ -316,7 +317,7 @@ int html_message(char *list,
 		}
 	} else {
 		prev = 0;
-		error = lseek(fd, idx_offset, SEEK_SET) != idx_offset;
+		error = idx_lseek(fd, idx_offset, SEEK_SET) != idx_offset;
 		got = error ? -1 :
 		    read_loop(fd, &idx_msg[1], sizeof(idx_msg[1]) * 2);
 		if (got != sizeof(idx_msg[1]) * 2) {
@@ -332,7 +333,7 @@ int html_message(char *list,
 		aday = YMD2ADAY(idx_msg[0].y, idx_msg[0].m, idx_msg[0].d);
 		idx_offset = aday * sizeof(m0);
 		error =
-		    lseek(fd, idx_offset, SEEK_SET) != idx_offset ||
+		    idx_lseek(fd, idx_offset, SEEK_SET) != idx_offset ||
 		    read_loop(fd, &m0, sizeof(m0)) != sizeof(m0);
 		if (m1 > m0)
 			n0 = m1 - m0;
@@ -628,7 +629,7 @@ int html_day_index(char *list, unsigned int y, unsigned int m, unsigned int d)
 	if (!idx_file)
 		return html_error(NULL);
 
-	fd = open(idx_file, O_RDONLY);
+	fd = idx_open(idx_file);
 	error = errno;
 	free(idx_file);
 	if (fd < 0)
@@ -639,7 +640,7 @@ int html_day_index(char *list, unsigned int y, unsigned int m, unsigned int d)
 	idx_offset = aday * sizeof(idx_msgnum_t);
 	error =
 	    lock_fd(fd, 1) ||
-	    lseek(fd, idx_offset, SEEK_SET) != idx_offset ||
+	    idx_lseek(fd, idx_offset, SEEK_SET) != idx_offset ||
 	    read_loop(fd, &mx, sizeof(mx)) != sizeof(mx);
 	if (error || mx[0] < 1 || mx[0] >= MAX_MAILBOX_MESSAGES) {
 		unlock_fd(fd);
@@ -665,7 +666,7 @@ int html_day_index(char *list, unsigned int y, unsigned int m, unsigned int d)
 	size_n = size + sizeof(struct idx_message);
 
 	error = !(mp = malloc(size_n)) ||
-		lseek(fd, idx_offset, SEEK_SET) != idx_offset;
+		idx_lseek(fd, idx_offset, SEEK_SET) != idx_offset;
 	got = error ? -1 :
 	    read_loop(fd, mp, size_n);
 	if (got != size && got != size_n) {
@@ -761,7 +762,7 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 	if (!idx_file)
 		return html_error(NULL);
 
-	fd = open(idx_file, O_RDONLY);
+	fd = idx_open(idx_file);
 	error = errno;
 	free(idx_file);
 	if (fd < 0)
@@ -770,7 +771,7 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 
 	idx_offset = aday * sizeof(idx_msgnum_t);
 	if (lock_fd(fd, 1) ||
-	    lseek(fd, idx_offset, SEEK_SET) != idx_offset ||
+	    idx_lseek(fd, idx_offset, SEEK_SET) != idx_offset ||
 	    read_loop(fd, mn, sizeof(mn)) != sizeof(mn)) {
 		unlock_fd(fd);
 		close(fd);
@@ -814,7 +815,7 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 		size_n = size + sizeof(struct idx_message);
 
 		if (!(msgp = malloc(size_n)) ||
-		    lseek(fd, idx_offset, SEEK_SET) != idx_offset ||
+		    idx_lseek(fd, idx_offset, SEEK_SET) != idx_offset ||
 		    (got = read_loop(fd, msgp, size_n)) == -1 ||
 			(got != size && got != size_n)) {
 			unlock_fd(fd);
@@ -959,7 +960,7 @@ int html_year_index(char *list, unsigned int y)
 	if (!idx_file)
 		return html_error(NULL);
 
-	fd = open(idx_file, O_RDONLY);
+	fd = idx_open(idx_file);
 	error = errno;
 	free(idx_file);
 	if (fd < 0)
@@ -974,7 +975,7 @@ int html_year_index(char *list, unsigned int y)
 
 	idx_offset = aday * sizeof(idx_msgnum_t);
 	if (lock_fd(fd, 1) ||
-	    (idx_offset && lseek(fd, idx_offset, SEEK_SET) != idx_offset) ||
+	    (idx_offset && idx_lseek(fd, idx_offset, SEEK_SET) != idx_offset) ||
 	    read_loop(fd, mn, mn_size) != mn_size) {
 		unlock_fd(fd);
 		close(fd);
@@ -1012,7 +1013,7 @@ int html_year_index(char *list, unsigned int y)
 		off_t size = sizeof(struct idx_message);
 		if (first > 1) {
 			idx_offset = IDX2IDX(first - 2);
-			if (lseek(fd, idx_offset, SEEK_SET) != idx_offset ||
+			if (idx_lseek(fd, idx_offset, SEEK_SET) != idx_offset ||
 			    read_loop(fd, &msg, size) != size) {
 				unlock_fd(fd);
 				close(fd);
@@ -1023,7 +1024,7 @@ int html_year_index(char *list, unsigned int y)
 		}
 		if (lastn > 1) {
 			idx_offset = IDX2IDX(lastn);
-			if (lseek(fd, idx_offset, SEEK_SET) == idx_offset &&
+			if (idx_lseek(fd, idx_offset, SEEK_SET) == idx_offset &&
 			    read_loop(fd, &msg, size) == size)
 				next = MIN_YEAR + msg.y;
 		}
@@ -1042,7 +1043,7 @@ int html_year_index(char *list, unsigned int y)
 		recent_offset = lastn - recent_count;
 		idx_offset = IDX2IDX(recent_offset - 1);
 		if (!(msg = malloc(size)) ||
-		    lseek(fd, idx_offset, SEEK_SET) != idx_offset ||
+		    idx_lseek(fd, idx_offset, SEEK_SET) != idx_offset ||
 		    (read_loop(fd, msg, size) != size))
 			recent_count = 0;
 

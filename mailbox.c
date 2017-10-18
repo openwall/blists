@@ -514,6 +514,7 @@ static int mailbox_parse_fd(int fd)
 				if (!msg.data_offset) break;
 				msg.raw_size = offset - msg.raw_offset;
 				msg.data_size = offset - body - msg.data_offset;
+				log_percentage(offset, stat.st_size);
 				if (message_process(&msg)) break;
 			}
 			msg.tm.tm_year = 0;
@@ -704,7 +705,12 @@ int mailbox_parse(char *mailbox)
 	 * of the next unparsed message in mbox (inc_ofs) */
 	if (!error && (idx_fd = open(idx, O_RDWR)) >= 0) {
 		error = lock_fd(idx_fd, 1);
+		if (idx_check_header(idx_fd)) {
+			logtty("Incompatible index (needs rebuild).\n");
+			error = 1;
+		}
 		if (!error) {
+			logtty("Resuming index file\n");
 			inc_ofs = begin_inc_idx(idx_fd, fd);
 			error = inc_ofs < 0;
 		}
@@ -729,6 +735,7 @@ int mailbox_parse(char *mailbox)
 
 	/* load messages into idx_message msgs[] */
 	if (!error) {
+		logtty("Parsing mailbox from %lu...\n", inc_ofs);
 		error = mailbox_parse_fd(fd);
 		if (unlock_fd(fd) && !error) error = 1;
 	}
@@ -736,23 +743,36 @@ int mailbox_parse(char *mailbox)
 	if (close(fd) && !error) error = 1;
 
 	/* update index map and rebuild thread links */
-	if (!error)
+	if (!error) {
+		logtty("Linking threads...\n");
 		error = msgs_final(old_msg_num) < 0;
+	}
 
-	if (!error)
+	/* index file is always fully rewritten */
+	if (!error) {
+		logtty("Processing finished, writing index...\n");
 		error = lock_fd(idx_fd, 0);
+	}
 
 	if (!error)
 		error = lseek(idx_fd, 0, SEEK_SET) != 0;
 
+	if (!error) {
+		logtty("Writing header...\n");
+		error = idx_write_header(idx_fd);
+	}
+
 	/* write messages-per-day array */
-	if (!error)
+	if (!error) {
+		logtty("Writing messages index...\n");
 		error =
 		    write_loop(idx_fd, num_by_aday, sizeof(num_by_aday))
 		    != sizeof(num_by_aday);
+	}
 
 	/* write messages metadata */
 	if (!error) {
+		logtty("Writing messages metadata...\n");
 		msgs_size = msg_num * sizeof(struct idx_message);
 		error = write_loop(idx_fd, msgs, msgs_size) != msgs_size;
 	}
@@ -764,8 +784,10 @@ int mailbox_parse(char *mailbox)
 		error = idx_size == -1;
 	}
 
-	if (!error)
+	if (!error) {
 		error = ftruncate(idx_fd, idx_size) != 0;
+		logtty("Done.\n");
+	}
 
 	if (idx_fd >= 0) {
 		if (unlock_fd(idx_fd) && !error) error = 1;

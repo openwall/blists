@@ -57,7 +57,7 @@ struct idx_message {
 };
 
 /* return number of messages in this day */
-inline int aday_count(const idx_msgnum_t *mn) {
+static inline int aday_count(const idx_msgnum_t *mn) {
 	if (mn[0] < 1)
 		return 0;
 	else {
@@ -67,5 +67,10 @@ inline int aday_count(const idx_msgnum_t *mn) {
 			return mn[1] - mn[0];
 	}
 }
+
+extern int idx_check_header(int fd);
+extern int idx_open(char *idx_file);
+extern int idx_write_header(int fd);
+extern off_t idx_lseek(int fd, off_t idx_offset, int whence);
 
 #endif
