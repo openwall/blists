@@ -43,11 +43,14 @@ typedef unsigned char idx_flags_t;
 struct idx_message {
 	idx_off_t offset;
 	idx_size_t size;
-	idx_hash_t msgid_hash, irt_hash;
+	idx_hash_t msgid_hash;	/* Message-ID */
+	idx_hash_t irt_hash;	/* In-Reply-To or last References tag */
 	struct {
-		idx_msgnum_t pn, nn;
-		idx_ymd_t py, pm, pd, ny, nm, nd;
-	} t;
+		idx_msgnum_t pn; /* prev */
+		idx_msgnum_t nn; /* next */
+		idx_ymd_t py, pm, pd;
+		idx_ymd_t ny, nm, nd;
+	} t; /* thread links */
 	idx_ymd_t y, m, d;
 	idx_flags_t flags;
 	char strings[IDX_STRINGS_SIZE];

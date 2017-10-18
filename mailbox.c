@@ -42,8 +42,9 @@
  */
 static idx_msgnum_t num_by_aday[N_ADAY + 1];
 
-static idx_msgnum_t msg_num, msg_alloc;
-static struct idx_message *msgs;
+static idx_msgnum_t msg_num;	/* number of actual messages in msgs[] */
+static idx_msgnum_t msg_alloc;	/* (pre)allocated size of msgs[] (in messages) */
+static struct idx_message *msgs; /* flat array */
 static char *list;
 
 struct mem_message {
@@ -62,6 +63,8 @@ struct parsed_message {
 	char *from, *subject;
 };
 
+/* allocate new message in msgs[] */
+/* maintains msg_num global counter */
 static struct idx_message *msgs_grow(void)
 {
 	struct idx_message *new_msgs;
@@ -89,6 +92,7 @@ static struct idx_message *msgs_grow(void)
 	return &msgs[msg_num++];
 }
 
+/* convert parsed_message into idx_message and append it into msgs[] */
 static int message_process(struct parsed_message *msg)
 {
 	struct idx_message *idx_msg;
@@ -164,6 +168,7 @@ static int message_process(struct parsed_message *msg)
 	return 0;
 }
 
+/* rebuild next/prev thread links */
 static int msgs_link(void)
 {
 	idx_msgnum_t i;
@@ -244,6 +249,7 @@ static int cmp_msgs_by_day(const void *p1, const void *p2)
 	return (int)m1->d - (int)m2->d;
 }
 
+/* update messages-per-day array and rebuild thread links */
 static int msgs_final(idx_msgnum_t start_from)
 {
 	idx_msgnum_t i;
@@ -296,6 +302,8 @@ static int eq(char *s1, int n1, char *s2, int n2)
 	return !strncasecmp(s1, s2, n2);
 }
 
+/* read existing index file into memory (which is num_by_aday[] and msgs[]) */
+/* returns offset up to which the mailbox was indexed so far */
 static off_t begin_inc_idx(int idx_fd, int fd)
 {
 	struct idx_message m;
@@ -304,6 +312,7 @@ static off_t begin_inc_idx(int idx_fd, int fd)
 	off_t inc_ofs = 0;
 	int error = 0;
 
+	/* read messages-per-day array */
 	if (read_loop(idx_fd, &num_by_aday, sizeof(num_by_aday)) !=
 	    sizeof(num_by_aday))
 		return 0;
@@ -597,6 +606,7 @@ static int mailbox_parse_fd(int fd)
 					p = mime_decode_header(&mime);
 					while (*p && *p != '<') p++;
 					if (!*p) continue;
+					/* seek last reference */
 					do {
 						q = ++p;
 						while (*p && *p != '<') p++;
@@ -685,19 +695,26 @@ int mailbox_parse(char *mailbox)
 
 	idx_fd = -1;
 	idx = concat(mailbox, INDEX_FILENAME_SUFFIX, NULL);
-	if (idx) {
-		if (!error && (idx_fd = open(idx, O_RDWR)) >= 0) {
-			error = lock_fd(idx_fd, 1);
-			if (!error) {
-				inc_ofs = begin_inc_idx(idx_fd, fd);
-				error = inc_ofs < 0;
-			}
-			if (unlock_fd(idx_fd) && !error) error = 1;
-		}
-		if (!error && idx_fd < 0)
-			idx_fd = open(idx, O_CREAT | O_WRONLY, 0644);
-		free(idx);
+	if (!idx) {
+		close(fd);
+		return 1;
 	}
+
+	/* try to read index file and calculate offset
+	 * of the next unparsed message in mbox (inc_ofs) */
+	if (!error && (idx_fd = open(idx, O_RDWR)) >= 0) {
+		error = lock_fd(idx_fd, 1);
+		if (!error) {
+			inc_ofs = begin_inc_idx(idx_fd, fd);
+			error = inc_ofs < 0;
+		}
+		if (unlock_fd(idx_fd) && !error) error = 1;
+	}
+	/* otherwise create new index */
+	if (!error && idx_fd < 0)
+		idx_fd = open(idx, O_CREAT | O_WRONLY, 0644);
+	free(idx);
+
 	error = idx_fd < 0;
 
 	if (inc_ofs <= 0) {
@@ -710,6 +727,7 @@ int mailbox_parse(char *mailbox)
 	if (!error)
 		error = lseek(fd, inc_ofs, SEEK_SET) != inc_ofs;
 
+	/* load messages into idx_message msgs[] */
 	if (!error) {
 		error = mailbox_parse_fd(fd);
 		if (unlock_fd(fd) && !error) error = 1;
@@ -717,6 +735,7 @@ int mailbox_parse(char *mailbox)
 
 	if (close(fd) && !error) error = 1;
 
+	/* update index map and rebuild thread links */
 	if (!error)
 		error = msgs_final(old_msg_num) < 0;
 
@@ -726,11 +745,13 @@ int mailbox_parse(char *mailbox)
 	if (!error)
 		error = lseek(idx_fd, 0, SEEK_SET) != 0;
 
+	/* write messages-per-day array */
 	if (!error)
 		error =
 		    write_loop(idx_fd, num_by_aday, sizeof(num_by_aday))
 		    != sizeof(num_by_aday);
 
+	/* write messages metadata */
 	if (!error) {
 		msgs_size = msg_num * sizeof(struct idx_message);
 		error = write_loop(idx_fd, msgs, msgs_size) != msgs_size;

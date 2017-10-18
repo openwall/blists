@@ -83,6 +83,8 @@ int unlock_fd(int fd)
 	return 0;
 }
 
+/* read 'count' bytes resuming incomplete reads */
+/* returns how much bytes is read or error (negative value) */
 int read_loop(int fd, void *buffer, int count)
 {
 	int offset, block;
@@ -101,6 +103,7 @@ int read_loop(int fd, void *buffer, int count)
 	return offset;
 }
 
+/* write 'count' bytes resuming incomplete writes */
 int write_loop(int fd, const void *buffer, int count)
 {
 	int offset, block;
@@ -124,6 +127,7 @@ int write_loop(int fd, const void *buffer, int count)
 	return offset;
 }
 
+/* allocate combined string from NULL terminated variable argument list */
 char *concat(const char *s1, ...)
 {
 	va_list args;
