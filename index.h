@@ -68,10 +68,10 @@ static inline int aday_count(const idx_msgnum_t *mn) {
 	}
 }
 
-extern int idx_check_header(int fd);
+extern int idx_check_header(int fd, off_t *offset_p);
 extern int idx_open(const char *idx_file);
 extern int idx_close(int fd);
-extern int idx_write_header(int fd);
+extern int idx_write_header(int fd, off_t offset);
 extern int idx_read(int fd, off_t offset, void *buffer, int count);
 extern int idx_read_ok(int fd, off_t offset, void *buffer, int count);
 extern int idx_read_aday_ok(int fd, int aday, void *buffer, int count);

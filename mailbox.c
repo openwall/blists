@@ -705,9 +705,24 @@ int mailbox_parse(char *mailbox)
 	 * of the next unparsed message in mbox (inc_ofs) */
 	if (!error && (idx_fd = open(idx, O_RDWR)) >= 0) {
 		error = lock_fd(idx_fd, 1);
-		if (idx_check_header(idx_fd)) {
+		if (!error && idx_check_header(idx_fd, &inc_ofs)) {
 			logtty("Incompatible index (needs rebuild).\n");
 			error = 1;
+		}
+		/* if mbox is unmodified, exit w/o error */
+		if (!error) {
+			struct stat st;
+
+			if (!fstat(fd, &st) &&
+			    inc_ofs == st.st_size) {
+				logtty("Mbox is unmodified (%lu).\n",
+				    inc_ofs);
+				unlock_fd(idx_fd);
+				close(idx_fd);
+				unlock_fd(fd);
+				close(fd);
+				return 0;
+			}
 		}
 		if (!error) {
 			logtty("Resuming index file\n");
@@ -737,6 +752,7 @@ int mailbox_parse(char *mailbox)
 	if (!error) {
 		logtty("Parsing mailbox from %lu...\n", inc_ofs);
 		error = mailbox_parse_fd(fd);
+		inc_ofs = lseek(fd, 0, SEEK_CUR);
 		if (unlock_fd(fd) && !error) error = 1;
 	}
 
@@ -759,7 +775,7 @@ int mailbox_parse(char *mailbox)
 
 	if (!error) {
 		logtty("Writing header...\n");
-		error = idx_write_header(idx_fd);
+		error = idx_write_header(idx_fd, inc_ofs);
 	}
 
 	/* write messages-per-day array */
