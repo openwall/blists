@@ -3,6 +3,10 @@ indexed mbox files.  There are two programs: bindex and bit.  bindex
 generates or updates the index file (yes, incremental updates are
 supported).  bit is a CGI program, which generates web pages on the fly.
 
+  blists homepage: http://www.openwall.com/blists/
+  Live example with a high volume mailing list:
+      http://lists.openwall.net/linux-kernel/
+
 To compile, simply run "make".  There's currently no "install" target;
 you're supposed to copy the bindex and bit programs in place on your
 own, as appropriate for your setup. Also you may need to setup for your
