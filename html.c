@@ -256,7 +256,7 @@ int html_message(char *list,
 	unsigned int y, unsigned int m, unsigned int d, unsigned int n)
 {
 	unsigned int aday, n0, n2;
-	char *list_file, *idx_file;
+	char *list_file;
 	off_t idx_offset;
 	int fd, error, got, trunc, prev, next;
 	idx_msgnum_t m0, m1, m1r;
@@ -276,15 +276,9 @@ int html_message(char *list,
 
 	list_file = concat(MAIL_SPOOL_PATH "/", list, NULL);
 	if (!list_file) return html_error(NULL);
-	idx_file = concat(list_file, INDEX_FILENAME_SUFFIX, NULL);
-	if (!idx_file) {
-		free(list_file);
-		return html_error(NULL);
-	}
 
-	fd = idx_open(idx_file);
+	fd = idx_open(list);
 	error = errno;
-	free(idx_file);
 	if (fd < 0) {
 		free(list_file);
 		return html_error(error == ENOENT ?
@@ -292,24 +286,18 @@ int html_message(char *list,
 		    "Index needs rebuild" : NULL));
 	}
 
-	idx_offset = aday * sizeof(idx_msgnum_t);
-	error =
-	    lock_fd(fd, 1) ||
-	    idx_lseek(fd, idx_offset, SEEK_SET) != idx_offset ||
-	    read_loop(fd, &m1, sizeof(m1)) != sizeof(m1);
+	error = !idx_read_aday_ok(fd, aday, &m1, sizeof(m1));
 	if (error || m1 < 1 || m1 >= MAX_MAILBOX_MESSAGES) {
-		close(fd);
+		idx_close(fd);
 		free(list_file);
 		return html_error((error || m1 > 0) ? NULL : "No such message");
 	}
 	m1r = m1 + n - (1 + 1); /* both m1 and n are 1-based; m1r is 0-based */
-	idx_offset = IDX2IDX(m1r);
+	idx_offset = IDX2MSG(m1r);
 	prev = next = 1;
 	if (m1r >= 1) {
 		idx_offset -= sizeof(idx_msg[0]);
-		error = idx_lseek(fd, idx_offset, SEEK_SET) != idx_offset;
-		got = error ? -1 :
-		    read_loop(fd, &idx_msg, sizeof(idx_msg));
+		got = idx_read(fd, idx_offset, &idx_msg, sizeof(idx_msg));
 		if (got != sizeof(idx_msg)) {
 			error = got != sizeof(idx_msg[0]) * 2;
 			idx_msg[2] = idx_msg[1];
@@ -317,9 +305,7 @@ int html_message(char *list,
 		}
 	} else {
 		prev = 0;
-		error = idx_lseek(fd, idx_offset, SEEK_SET) != idx_offset;
-		got = error ? -1 :
-		    read_loop(fd, &idx_msg[1], sizeof(idx_msg[1]) * 2);
+		got = idx_read(fd, idx_offset, &idx_msg[1], sizeof(idx_msg[1]) * 2);
 		if (got != sizeof(idx_msg[1]) * 2) {
 			error = got != sizeof(idx_msg[1]);
 			idx_msg[2] = idx_msg[1];
@@ -331,19 +317,14 @@ int html_message(char *list,
 	n0 = n - 1;
 	if (!n0 && prev && !error) {
 		aday = YMD2ADAY(idx_msg[0].y, idx_msg[0].m, idx_msg[0].d);
-		idx_offset = aday * sizeof(m0);
-		error =
-		    idx_lseek(fd, idx_offset, SEEK_SET) != idx_offset ||
-		    read_loop(fd, &m0, sizeof(m0)) != sizeof(m0);
+		error = !idx_read_aday_ok(fd, aday, &m0, sizeof(m0));
 		if (m1 > m0)
 			n0 = m1 - m0;
 		else
 			error = 1;
 	}
 
-	if (unlock_fd(fd)) error = 1;
-
-	if (close(fd) || error) {
+	if (idx_close(fd) || error) {
 		free(list_file);
 		return html_error(got ? NULL : "No such message");
 	}
@@ -607,7 +588,6 @@ static void output_strings(struct buffer *dst, struct idx_message *m,
 int html_day_index(char *list, unsigned int y, unsigned int m, unsigned int d)
 {
 	unsigned int aday;
-	char *idx_file;
 	off_t idx_offset;
 	off_t size, size_n;
 	int fd, error, got;
@@ -624,27 +604,16 @@ int html_day_index(char *list, unsigned int y, unsigned int m, unsigned int d)
 		return html_error("Invalid date");
 	aday = YMD2ADAY(y - MIN_YEAR, m, d);
 
-	idx_file = concat(MAIL_SPOOL_PATH "/", list,
-	    INDEX_FILENAME_SUFFIX, NULL);
-	if (!idx_file)
-		return html_error(NULL);
-
-	fd = idx_open(idx_file);
+	fd = idx_open(list);
 	error = errno;
-	free(idx_file);
 	if (fd < 0)
 		return html_error(error == ENOENT ?
 		    "No such mailing list" : NULL);
 	/* read two consecutive aday entries
 	 * will need them to determine message count for this day */
-	idx_offset = aday * sizeof(idx_msgnum_t);
-	error =
-	    lock_fd(fd, 1) ||
-	    idx_lseek(fd, idx_offset, SEEK_SET) != idx_offset ||
-	    read_loop(fd, &mx, sizeof(mx)) != sizeof(mx);
+	error = !idx_read_aday_ok(fd, aday, &mx, sizeof(mx));
 	if (error || mx[0] < 1 || mx[0] >= MAX_MAILBOX_MESSAGES) {
-		unlock_fd(fd);
-		close(fd);
+		idx_close(fd);
 		return html_error((error || mx[0] > 0) ? NULL : "No messages"
 		    " for this day");
 	}
@@ -653,7 +622,7 @@ int html_day_index(char *list, unsigned int y, unsigned int m, unsigned int d)
 	else
 		count = -mx[1];
 	size = count * sizeof(struct idx_message);
-	idx_offset = IDX2IDX(mx[0] - 1);
+	idx_offset = IDX2MSG(mx[0] - 1);
 	if (mx[0] > 1) {
 		/* read one more entry for Prev day quick link */
 		size += sizeof(struct idx_message);
@@ -665,20 +634,16 @@ int html_day_index(char *list, unsigned int y, unsigned int m, unsigned int d)
 	/* read one more entry for Next day quick link */
 	size_n = size + sizeof(struct idx_message);
 
-	error = !(mp = malloc(size_n)) ||
-		idx_lseek(fd, idx_offset, SEEK_SET) != idx_offset;
-	got = error ? -1 :
-	    read_loop(fd, mp, size_n);
-	if (got != size && got != size_n) {
-		unlock_fd(fd);
-		close(fd);
+	if (!(mp = malloc(size_n)) ||
+	    (got = idx_read(fd, idx_offset, mp, size_n)) == -1 ||
+	    (got != size && got != size_n)) {
+		idx_close(fd);
 		free(mp);
 		return html_error("Index error");
 	}
 	next = (got == size_n) ? count + prev : 0;
 
-	if (unlock_fd(fd)) error = 1;
-	if (close(fd) || error || buffer_init(&dst, 0)) {
+	if (idx_close(fd) || error || buffer_init(&dst, 0)) {
 		free(mp);
 		return html_error(NULL);
 	}
@@ -742,8 +707,6 @@ int html_day_index(char *list, unsigned int y, unsigned int m, unsigned int d)
 int html_month_index(char *list, unsigned int y, unsigned int m)
 {
 	unsigned int d, n, aday, dp;
-	char *idx_file;
-	off_t idx_offset;
 	int fd, error;
 	idx_msgnum_t mn[32], mp, count, total;
 	struct buffer dst;
@@ -757,24 +720,14 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 		return html_error("Invalid date");
 	aday = ((y - MIN_YEAR) * 12 + (m - 1)) * 31;
 
-	idx_file = concat(MAIL_SPOOL_PATH "/", list,
-	    INDEX_FILENAME_SUFFIX, NULL);
-	if (!idx_file)
-		return html_error(NULL);
-
-	fd = idx_open(idx_file);
+	fd = idx_open(list);
 	error = errno;
-	free(idx_file);
 	if (fd < 0)
 		return html_error(error == ENOENT ?
 		    "No such mailing list" : NULL);
 
-	idx_offset = aday * sizeof(idx_msgnum_t);
-	if (lock_fd(fd, 1) ||
-	    idx_lseek(fd, idx_offset, SEEK_SET) != idx_offset ||
-	    read_loop(fd, mn, sizeof(mn)) != sizeof(mn)) {
-		unlock_fd(fd);
-		close(fd);
+	if (!idx_read_aday_ok(fd, aday, mn, sizeof(mn))) {
+		idx_close(fd);
 		return html_error("Index error");
 	}
 
@@ -791,8 +744,7 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 			count = (mn[d] > 0) ? mn[d] - mp : -mn[d];
 			if (count <= 0) {
 				buffer_free(&dst);
-				unlock_fd(fd);
-				close(fd);
+				idx_close(fd);
 				return html_error(NULL);
 			}
 			total += count;
@@ -802,10 +754,11 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 	/* have messages, allocate and read them */
 	if (total && first) {
 		off_t got;
+		off_t idx_offset;
 
 		first--;
 		size = total * sizeof(struct idx_message);
-		idx_offset = IDX2IDX(first);
+		idx_offset = IDX2MSG(first);
 		/* we need to read prev and next messages too */
 		if (first) {
 			size += sizeof(struct idx_message);
@@ -815,11 +768,9 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 		size_n = size + sizeof(struct idx_message);
 
 		if (!(msgp = malloc(size_n)) ||
-		    idx_lseek(fd, idx_offset, SEEK_SET) != idx_offset ||
-		    (got = read_loop(fd, msgp, size_n)) == -1 ||
-			(got != size && got != size_n)) {
-			unlock_fd(fd);
-			close(fd);
+		    (got = idx_read(fd, idx_offset, msgp, size_n)) == -1 ||
+		    (got != size && got != size_n)) {
+			idx_close(fd);
 			free(msgp);
 			return html_error("Index error");
 		}
@@ -827,8 +778,7 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 		next = (got == size_n) ? total + prev : 0;
 	}
 
-	if (unlock_fd(fd)) error = 1;
-	if (close(fd) || error || buffer_init(&dst, 0)) {
+	if (idx_close(fd) || error || buffer_init(&dst, 0)) {
 		free(msgp);
 		return html_error(NULL);
 	}
@@ -936,8 +886,6 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 int html_year_index(char *list, unsigned int y)
 {
 	unsigned int min_y, max_y, m, d, aday, rday;
-	char *idx_file;
-	off_t idx_offset;
 	int fd, error;
 	idx_msgnum_t *mn, count, monthly_total, total;
 	size_t mn_size;
@@ -955,30 +903,15 @@ int html_year_index(char *list, unsigned int y)
 		min_y = max_y = y;
 	}
 
-	idx_file = concat(MAIL_SPOOL_PATH "/", list,
-	    INDEX_FILENAME_SUFFIX, NULL);
-	if (!idx_file)
-		return html_error(NULL);
-
-	fd = idx_open(idx_file);
+	fd = idx_open(list);
 	error = errno;
-	free(idx_file);
 	if (fd < 0)
 		return html_error(error == ENOENT ?
 		    "No such mailing list" : NULL);
 
-	mn = malloc(mn_size);
-	if (!mn) {
-		close(fd);
-		return html_error(NULL);
-	}
-
-	idx_offset = aday * sizeof(idx_msgnum_t);
-	if (lock_fd(fd, 1) ||
-	    (idx_offset && idx_lseek(fd, idx_offset, SEEK_SET) != idx_offset) ||
-	    read_loop(fd, mn, mn_size) != mn_size) {
-		unlock_fd(fd);
-		close(fd);
+	if (!(mn = malloc(mn_size)) ||
+	    !idx_read_aday_ok(fd, aday, mn, mn_size)) {
+		idx_close(fd);
 		free(mn);
 		return html_error(NULL);
 	}
@@ -1012,20 +945,14 @@ int html_year_index(char *list, unsigned int y)
 		struct idx_message msg;
 		off_t size = sizeof(struct idx_message);
 		if (first > 1) {
-			idx_offset = IDX2IDX(first - 2);
-			if (idx_lseek(fd, idx_offset, SEEK_SET) != idx_offset ||
-			    read_loop(fd, &msg, size) != size) {
-				unlock_fd(fd);
-				close(fd);
+			if (!idx_read_msg_ok(fd, first - 2, &msg, size)) {
 				free(mn);
 				return html_error("Index error");
 			}
 			prev = MIN_YEAR + msg.y;
 		}
 		if (lastn > 1) {
-			idx_offset = IDX2IDX(lastn);
-			if (idx_lseek(fd, idx_offset, SEEK_SET) == idx_offset &&
-			    read_loop(fd, &msg, size) == size)
+			if (idx_read_msg_ok(fd, lastn, &msg, size))
 				next = MIN_YEAR + msg.y;
 		}
 	}
@@ -1041,10 +968,8 @@ int html_year_index(char *list, unsigned int y)
 			recent_count = lastn - 1;
 		size_t size = recent_count * sizeof(struct idx_message);
 		recent_offset = lastn - recent_count;
-		idx_offset = IDX2IDX(recent_offset - 1);
 		if (!(msg = malloc(size)) ||
-		    idx_lseek(fd, idx_offset, SEEK_SET) != idx_offset ||
-		    (read_loop(fd, msg, size) != size))
+		    !idx_read_msg_ok(fd, recent_offset - 1, msg, size))
 			recent_count = 0;
 
 		/* resolve to message number in the day and cache in offset field */
@@ -1062,8 +987,7 @@ int html_year_index(char *list, unsigned int y)
 				}
 			}
 	}
-	if (unlock_fd(fd)) error = 1;
-	if (close(fd) || error || buffer_init(&dst, 0)) {
+	if (idx_close(fd) || error || buffer_init(&dst, 0)) {
 		free(msg);
 		free(mn);
 		return html_error(NULL);

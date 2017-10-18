@@ -21,7 +21,7 @@
 	(((unsigned int)(y) * 12 + \
 	((unsigned int)(m) - 1)) * 31 + \
 	((unsigned int)(d) - 1))
-#define IDX2IDX(a) \
+#define IDX2MSG(a) \
 	((N_ADAY + 1) * sizeof(idx_msgnum_t) + \
 	(a) * sizeof(struct idx_message))
 
@@ -69,8 +69,12 @@ static inline int aday_count(const idx_msgnum_t *mn) {
 }
 
 extern int idx_check_header(int fd);
-extern int idx_open(char *idx_file);
+extern int idx_open(const char *idx_file);
+extern int idx_close(int fd);
 extern int idx_write_header(int fd);
-extern off_t idx_lseek(int fd, off_t idx_offset, int whence);
+extern int idx_read(int fd, off_t offset, void *buffer, int count);
+extern int idx_read_ok(int fd, off_t offset, void *buffer, int count);
+extern int idx_read_aday_ok(int fd, int aday, void *buffer, int count);
+extern int idx_read_msg_ok(int fd, int idx, void *buffer, int count);
 
 #endif
