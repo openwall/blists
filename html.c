@@ -278,8 +278,8 @@ int html_message(char *list,
 	if (!list_file) return html_error(NULL);
 
 	fd = idx_open(list);
-	error = errno;
 	if (fd < 0) {
+		error = errno;
 		free(list_file);
 		return html_error(error == ENOENT ?
 		    "No such mailing list" : (error == ESRCH ?
@@ -589,8 +589,8 @@ int html_attachment(char *list,
 	if (!list_file) return html_error(NULL);
 
 	fd = idx_open(list);
-	error = errno;
 	if (fd < 0) {
+		error = errno;
 		free(list_file);
 		return html_error(error == ENOENT ?
 		    "No such mailing list" : (error == ESRCH ?
@@ -798,9 +798,8 @@ int html_day_index(char *list, unsigned int y, unsigned int m, unsigned int d)
 	aday = YMD2ADAY(y - MIN_YEAR, m, d);
 
 	fd = idx_open(list);
-	error = errno;
 	if (fd < 0)
-		return html_error(error == ENOENT ?
+		return html_error(errno == ENOENT ?
 		    "No such mailing list" : NULL);
 	/* read two consecutive aday entries
 	 * will need them to determine message count for this day */
@@ -900,7 +899,7 @@ int html_day_index(char *list, unsigned int y, unsigned int m, unsigned int d)
 int html_month_index(char *list, unsigned int y, unsigned int m)
 {
 	unsigned int d, n, aday, dp;
-	int fd, error;
+	int fd;
 	idx_msgnum_t mn[32], mp, count, total;
 	struct buffer dst;
 	int first; /* first message of this month */
@@ -914,9 +913,8 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 	aday = ((y - MIN_YEAR) * 12 + (m - 1)) * 31;
 
 	fd = idx_open(list);
-	error = errno;
 	if (fd < 0)
-		return html_error(error == ENOENT ?
+		return html_error(errno == ENOENT ?
 		    "No such mailing list" : NULL);
 
 	if (!idx_read_aday_ok(fd, aday, mn, sizeof(mn))) {
@@ -971,7 +969,7 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 		next = (got == size_n) ? total + prev : 0;
 	}
 
-	if (idx_close(fd) || error || buffer_init(&dst, 0)) {
+	if (idx_close(fd) || buffer_init(&dst, 0)) {
 		free(msgp);
 		return html_error(NULL);
 	}
@@ -1079,7 +1077,7 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 int html_year_index(char *list, unsigned int y)
 {
 	unsigned int min_y, max_y, m, d, aday, rday;
-	int fd, error;
+	int fd;
 	idx_msgnum_t *mn, count, monthly_total, total;
 	size_t mn_size;
 	struct buffer dst;
@@ -1097,9 +1095,8 @@ int html_year_index(char *list, unsigned int y)
 	}
 
 	fd = idx_open(list);
-	error = errno;
 	if (fd < 0)
-		return html_error(error == ENOENT ?
+		return html_error(errno == ENOENT ?
 		    "No such mailing list" : NULL);
 
 	if (!(mn = malloc(mn_size)) ||
@@ -1180,7 +1177,7 @@ int html_year_index(char *list, unsigned int y)
 				}
 			}
 	}
-	if (idx_close(fd) || error || buffer_init(&dst, 0)) {
+	if (idx_close(fd) || buffer_init(&dst, 0)) {
 		free(msg);
 		free(mn);
 		return html_error(NULL);

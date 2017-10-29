@@ -53,18 +53,26 @@ int idx_open(const char *list)
 {
 	int fd;
 	char *idx_file;
+	int error;
 
 	idx_file = concat(MAIL_SPOOL_PATH "/", list,
 	    INDEX_FILENAME_SUFFIX, NULL);
-	if (!idx_file)
+	if (!idx_file) {
+		errno = ENOMEM;
 		return -1;
+	}
 
 	fd = open(idx_file, O_RDONLY);
+	error = errno;
 	free(idx_file);
-	if (fd < 0)
+	if (fd < 0) {
+		errno = error;
 		return -1;
+	}
 	if (lock_fd(fd, 1)) {
+		error = errno;
 		close(fd);
+		errno = error;
 		return -1;
 	}
 	if (idx_check_header(fd, NULL) == -1) {
@@ -73,7 +81,6 @@ int idx_open(const char *list)
 		errno = ESRCH; /* open() never returns this */
 		return -1;
 	}
-	errno = 0;
 	return fd;
 }
 
