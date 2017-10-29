@@ -54,7 +54,7 @@ void log_percentage(off_t offset, off_t size)
 	if ((offset - last_offset) < 1000000)
 		return;
 	now = time(NULL);
-	if (last_ts && (now - last_ts) < 1)
+	if (now == last_ts)
 		return;
 	last_offset = offset;
 	last_ts = now;
