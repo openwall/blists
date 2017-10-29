@@ -628,12 +628,12 @@ int html_attachment(char *list,
 	unsigned int y, unsigned int m, unsigned int d, unsigned int n,
 	unsigned int a)
 {
-	unsigned int aday, n0, n2;
+	unsigned int aday;
 	char *list_file;
 	off_t idx_offset;
-	int fd, error, got, trunc, prev, next;
-	idx_msgnum_t m0, m1, m1r;
-	struct idx_message idx_msg[3];
+	int fd, error, got, trunc;
+	idx_msgnum_t m1, m1r;
+	struct idx_message idx_msg;
 	idx_off_t offset;
 	idx_size_t size;
 	struct buffer src, dst;
@@ -665,56 +665,26 @@ int html_attachment(char *list,
 		free(list_file);
 		return html_error((error || m1 > 0) ? NULL : "No such message");
 	}
-	m1r = m1 + n - (1 + 1); /* both m1 and n are 1-based; m1r is 0-based */
+	m1r = m1 + n - 2; /* both m1 and n are 1-based; m1r is 0-based */
 	idx_offset = IDX2MSG(m1r);
-	prev = next = 1;
-	if (m1r >= 1) {
-		idx_offset -= sizeof(idx_msg[0]);
-		got = idx_read(fd, idx_offset, &idx_msg, sizeof(idx_msg));
-		if (got != sizeof(idx_msg)) {
-			error = got != sizeof(idx_msg[0]) * 2;
-			idx_msg[2] = idx_msg[1];
-			next = 0;
-		}
-	} else {
-		prev = 0;
-		got = idx_read(fd, idx_offset, &idx_msg[1], sizeof(idx_msg[1]) * 2);
-		if (got != sizeof(idx_msg[1]) * 2) {
-			error = got != sizeof(idx_msg[1]);
-			idx_msg[2] = idx_msg[1];
-			next = 0;
-		}
-		idx_msg[0] = idx_msg[1];
-	}
-
-	n0 = n - 1;
-	if (!n0 && prev && !error) {
-		aday = YMD2ADAY(idx_msg[0].y, idx_msg[0].m, idx_msg[0].d);
-		error = !idx_read_aday_ok(fd, aday, &m0, sizeof(m0));
-		if (m1 > m0)
-			n0 = m1 - m0;
-		else
-			error = 1;
-	}
+	got = idx_read(fd, idx_offset, &idx_msg, sizeof(idx_msg));
+	if (got != sizeof(idx_msg))
+		error = 1;
 
 	if (idx_close(fd) || error) {
 		free(list_file);
 		return html_error(got ? NULL : "No such message");
 	}
 
-	n2 = n + 1;
-	if (idx_msg[2].y != idx_msg[1].y ||
-	    idx_msg[2].m != m || idx_msg[2].d != d)
-		n2 = 1;
-
-	if (y - MIN_YEAR != idx_msg[1].y ||
-	    m != idx_msg[1].m || d != idx_msg[1].d) {
+	if (y - MIN_YEAR != idx_msg.y ||
+	    m != idx_msg.m ||
+	    d != idx_msg.d) {
 		free(list_file);
 		return html_error("No such message");
 	}
 
-	offset = idx_msg[1].offset;
-	size = idx_msg[1].size;
+	offset = idx_msg.offset;
+	size = idx_msg.size;
 
 	trunc = size > MAX_WITH_ATTACHMENT_SIZE;
 	if (trunc)
