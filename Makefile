@@ -11,8 +11,8 @@ CC = gcc
 LD = $(CC)
 RM = rm -f
 MKDIR = mkdir -p
-CFLAGS  = -ggdb -c -Wall -D_FILE_OFFSET_BITS=64
-LDFLAGS = -ggdb
+CFLAGS  = -c -Wall -O2 -fomit-frame-pointer -D_FILE_OFFSET_BITS=64
+LDFLAGS = -s
 
 PROJ = bindex bit
 OBJS_COMMON = misc.o buffer.o mime.o encoding.o index.o
