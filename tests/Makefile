@@ -22,9 +22,10 @@ all: $(PROJ) run
 run: $(PROJ)
 	./tests
 
-tests: $(OBJS_COMMON) ../*.c ../*.h
-	$(LD) $(LDFLAGS) $(OBJS_COMMON) -o $@
+tests: $(OBJS_COMMON)
+	$(LD) $(LDFLAGS) $(OBJS_COMMON)  -o $@
 
+tests.o: ../*.c ../*.h
 
 md5.o: ../md5/md5.c ../md5/md5.h
 	$(CC) $(CFLAGS) -c ../md5/md5.c -o md5.o
