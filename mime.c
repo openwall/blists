@@ -310,7 +310,7 @@ static inline int islinearwhitespace(char ch)
 }
 
 /* decode mime-encoded-words, ex: =?charset?encoding?encoded_text?= */
-static void decode_header(struct mime_ctx *ctx, char *header, size_t length)
+void decode_header(struct mime_ctx *ctx, char *header, size_t length)
 {
 	char *done, *p, *q, *end, *charset, *encoding;
 	struct buffer *dst = &ctx->dst;
@@ -326,17 +326,25 @@ static void decode_header(struct mime_ctx *ctx, char *header, size_t length)
 		if (*p != '?') continue;
 		q = p;
 		charset = ++q;
+		if (q >= end) continue;
+		if (!istokenchar(*q++)) continue;
 		for (; q < end && istokenchar(*q); q++);
+		if (q >= end) continue;
 		if (*q++ != '?') continue;
 		if (q >= end) continue;
-		if (!istokenchar(*q)) continue;
+		if (*q != 'q' && *q != 'Q' && *q != 'B' && *q != 'b')
+			continue;
 		encoding = q++;
 		if (q >= end) continue;
 		if (*q++ != '?') continue;
+		if (q >= end) continue;
+		if (!isencodedchar(*q++)) continue;
 		for (; q < end && isencodedchar(*q); q++);
+		if (q >= end) continue;
 		if (*q++ != '?') continue;
 		if (q >= end) continue;
 		if (*q != '=') continue;
+		if (q + 1 - (p - 1) > 75) continue;
 		/* skip adjacent linear-white-space between previous encoded-word */
 		r = --p - 1;
 		if (done != header)
