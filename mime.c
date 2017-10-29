@@ -348,8 +348,11 @@ void decode_header(struct mime_ctx *ctx, char *header, size_t length)
 		if (q + 1 - (p - 1) > 75) continue;
 		/* skip adjacent linear-white-space between previous encoded-word */
 		r = --p - 1;
-		if (done != header)
+		if (done != header) {
 			for (; r >= done && islinearwhitespace(*r); r--);
+			if (r >= done)
+				r = p - 1;
+		}
 		buffer_append(dst, done, r + 1 - done);
 		done = ++q;
 		if (*encoding == 'Q' || *encoding == 'q') {

@@ -90,7 +90,7 @@ void test_encoded_words(void)
 
 	test_decode_header(" (=?ISO-8859-1?Q?a?= =?ISO-8859-1?Q?b?=)",  " (ab)");
 	test_decode_header("x (=?ISO-8859-1?Q?a?= =?ISO-8859-1?Q?b?=)", "x (ab)");
-	test_decode_header("(=?ISO-8859-1?Q?a?= x =?ISO-8859-1?Q?b?=)", "(a xb)"); // this is incorrect
+	test_decode_header("(=?ISO-8859-1?Q?a?= x =?ISO-8859-1?Q?b?=)", "(a x b)");
 
 	/* test improperly encoded mime-words */
 	test_decode_header_inv("=??utf-8?Q?test?=");	// duplicated '?'
