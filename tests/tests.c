@@ -1,14 +1,25 @@
-/* Experimental unit-test for blists/mime.c.
- * gcc -o mime-test mime-test.c mime.o buffer.o encoding.o
+/*
+ * Experimental unit-test for blists/mime.c.
+ *
+ * Copyright (c) 2017 ABC <abc at openwall.com>
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted.
+ *
+ * There's ABSOLUTELY NO WARRANTY, express or implied.
  */
 
 #include <stdio.h>
 #include <string.h>
 #include <err.h>
 
-#include "buffer.h"
-#include "encoding.h"
-#include "mime.h"
+#include "../buffer.h"
+#include "../encoding.h"
+#include "../mime.h"
+
+#include "../buffer.c"
+#include "../encoding.c"
+#include "../mime.c"
 
 void test_decode_header(char *istr, char *ostr)
 {
@@ -18,35 +29,29 @@ void test_decode_header(char *istr, char *ostr)
 	size_t olen = strlen(ostr);
 
 	if (buffer_init(&src, 1024))
-		errx(1, "buffer_init(src) error\n");
+		errx(1, " buffer_init(src) error\n");
 
 	if (buffer_init(&dst, 1024))
-		errx(1, "buffer_init(dst) error\n");
+		errx(1, " buffer_init(dst) error\n");
 
 	if (mime_init(&mime, &src))
-		errx(1, "mime_init() error\n");
+		errx(1, " mime_init() error\n");
 
 
 	buffer_append(&src, istr, ilen);
 	decode_header(&mime, src.start, ilen);
 
 	if (mime.dst.ptr - mime.dst.start != olen)
-		errx(1, "decode_header: incorrect output len (`%s' -> `%.*s' %d != %d `%s')\n",
+		errx(1, " decode_header: incorrect output (`%s' -> `%.*s' [%d] vs `%s' [%d])\n",
 		    istr,
 		    mime.dst.ptr - mime.dst.start,
 		    mime.dst.start,
 		    mime.dst.ptr - mime.dst.start,
-		    olen,
-		    ostr);
+		    ostr,
+		    olen);
 
-	if (memcmp(mime.dst.start, ostr, olen) != 0)
-		errx(1, "decode_header: incorrect output (`%s' -> `%.*s' != `%s')\n",
-		    istr,
-		    mime.dst.ptr - mime.dst.start,
-		    mime.dst.start,
-		    ostr);
 
-	printf("decode_header: [%s] OK\n", istr);
+	printf(" decode_header: [%s] OK\n", istr);
 
 	mime_free(&mime);
 	buffer_free(&src);
@@ -117,6 +122,8 @@ void test_encoded_words(void)
 
 int main(int argc, char **argv)
 {
+	printf("Unit-test for blists\n");
 	test_encoded_words();
+	printf("Success\n");
 	return 0;
 }

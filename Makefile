@@ -21,6 +21,9 @@ OBJS_BIT = bit.o html.o
 
 all: $(PROJ)
 
+test:
+	make -C tests
+
 bindex: $(OBJS_BINDEX) $(OBJS_COMMON)
 	$(LD) $(LDFLAGS) $(OBJS_BINDEX) $(OBJS_COMMON) -o $@
 
