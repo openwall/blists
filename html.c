@@ -137,8 +137,6 @@ static void buffer_append_obfuscate(struct buffer *dst, char *what,
 
 	while (ptr < end) {
 		switch ((c = (unsigned char)*ptr++)) {
-		case '\r':
-			break;
 		case '@':
 			if (ptr - what >= 2 &&
 			    end - ptr >= 4 &&
