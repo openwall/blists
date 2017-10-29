@@ -558,28 +558,34 @@ int html_message(char *list,
 			if (mime.entities->boundary)
 				body = NULL;
 			else {
-				if (is_attachment(&mime))
+				if (is_attachment(&mime)) {
 					attachment_count++;
-				if (!is_inline(&mime)) {
-					buffer_appendf(&dst, "\n[ <a href=\"%u/%u\"",
-					    n, attachment_count);
-
-					/* attempt to stop search engines
-					 * to index binary attachments */
-					if (strncasecmp(mime.entities->type, "text/", 5))
+					if (!is_inline(&mime)) {
 						buffer_appendf(&dst,
-						    " rel=\"nofollow\" download>Download");
-					else
-						buffer_appends(&dst, ">View");
-					buffer_appends(&dst, " attachment");
-					if (mime.entities->filename) {
-						buffer_appendc(&dst, ' ');
-						buffer_appends_html(&dst, mime.entities->filename);
+						    "\n[ <a href=\"%u/%u\"",
+						    n, attachment_count);
+
+						/* attempt to stop search engines
+						 * from indexing binary attachments */
+						if (strncasecmp(mime.entities->type, "text/", 5))
+							buffer_appendf(&dst,
+							    " rel=\"nofollow\" download>Download");
+						else
+							buffer_appends(&dst, ">View");
+						buffer_appends(&dst, " attachment");
+						if (mime.entities->filename) {
+							buffer_appendc(&dst, ' ');
+							buffer_appends_html(&dst,
+							    mime.entities->filename);
+						}
+						buffer_appends(&dst,
+						    " of type ");
+						buffer_appends_html(&dst,
+						    mime.entities->type);
+						buffer_appends(&dst,
+						    "</a> ]\n");
+						body = NULL;
 					}
-					buffer_appends(&dst, " of type ");
-					buffer_appends_html(&dst, mime.entities->type);
-					buffer_appends(&dst, "</a> ]\n");
-					body = NULL;
 				}
 			}
 			if (body) {
