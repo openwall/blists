@@ -329,7 +329,8 @@ static void decode_header(struct mime_ctx *ctx, char *header, size_t length)
 		charset = ++q;
 		if (q >= end) continue;
 		if (!istokenchar(*q++)) continue;
-		for (; q < end && istokenchar(*q); q++);
+		while (q < end && istokenchar(*q))
+			q++;
 		if (q >= end) continue;
 		if (*q++ != '?') continue;
 		if (q >= end) continue;
@@ -340,20 +341,23 @@ static void decode_header(struct mime_ctx *ctx, char *header, size_t length)
 		if (*q++ != '?') continue;
 		if (q >= end) continue;
 		if (!isencodedchar(*q++)) continue;
-		for (; q < end && isencodedchar(*q); q++);
+		while (q < end && isencodedchar(*q))
+			q++;
 		if (q >= end) continue;
 		if (*q++ != '?') continue;
 		if (q >= end) continue;
 		if (*q != '=') continue;
 		if (q + 1 - (p - 1) > 75) continue;
-		/* skip adjacent linear-white-space between previous encoded-word */
-		r = --p - 1;
+		/* skip adjacent linear-white-space between previous
+		 * encoded-word */
+		r = --p;
 		if (done != header) {
-			for (; r >= done && islinearwhitespace(*r); r--);
-			if (r >= done)
-				r = p - 1;
+			while (r > done && islinearwhitespace(*(--r)))
+				;
+			if (r > done)
+				r = p;
 		}
-		buffer_append(dst, done, r + 1 - done);
+		buffer_append(dst, done, r - done);
 		done = ++q;
 		if (*encoding == 'Q' || *encoding == 'q') {
 			decode_qp(&ctx->enc, encoding + 2, q - encoding - 4, 1);
