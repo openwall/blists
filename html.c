@@ -569,29 +569,25 @@ int html_message(char *list,
 				if (is_attachment(&mime)) {
 					attachment_count++;
 					if (!is_inline(&mime)) {
-						buffer_appendf(&dst,
-						    "\n[ <a href=\"%u/%u\"",
-						    n, attachment_count);
+						int text = 0;
 
-						/* attempt to stop search engines
-						 * from indexing binary attachments */
-						if (strncasecmp(mime.entities->type, "text/", 5))
-							buffer_appendf(&dst,
-							    " rel=\"nofollow\" download>Download");
-						else
-							buffer_appends(&dst, ">View");
-						buffer_appends(&dst, " attachment");
-						if (mime.entities->filename) {
-							buffer_appendc(&dst, ' ');
+						if (!strncasecmp(mime.entities->type, "text/", 5))
+							text = 1;
+						buffer_appendf(&dst,
+						    "\n<span style=\"font-family: times;\"><strong>"
+						    "%s attachment:</strong> <a href=\"%u/%u\"%s>",
+						    text ? "View" : "Download",
+						    n, attachment_count,
+						    text ? "" :  " rel=\"nofollow\" download");
+						if (mime.entities->filename)
 							buffer_appends_html(&dst,
 							    mime.entities->filename);
-						}
 						buffer_appends(&dst,
-						    " of type ");
+						    " (<i>");
 						buffer_appends_html(&dst,
 						    mime.entities->type);
 						buffer_appends(&dst,
-						    "</a> ]\n");
+						    "</i>)</a></span>\n");
 						body = NULL;
 					}
 				}
