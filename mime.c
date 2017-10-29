@@ -120,7 +120,7 @@ static void process_header(struct mime_ctx *ctx, char *header)
 	struct mime_entity *entity;
 	char *p, *a, *v;
 	int multipart = 0;
-	int type;
+	enum { CONTENT_TYPE, CONTENT_DISPOSITION } type;
 
 	if (!strncasecmp(header, "Content-Transfer-Encoding:", 26)) {
 		p = header + 26;
@@ -130,14 +130,14 @@ static void process_header(struct mime_ctx *ctx, char *header)
 	}
 
 	if (!strncasecmp(header, "Content-Type:", 13))
-		type = 1;
+		type = CONTENT_TYPE;
 	else if (!strncasecmp(header, "Content-Disposition:", 20))
-		type = 2;
+		type = CONTENT_DISPOSITION;
 	else
 		return;
 
 	entity = ctx->entities;
-	if (type == 1) {
+	if (type == CONTENT_TYPE) {
 		entity->boundary = NULL;
 
 		p = header + 13;
@@ -170,7 +170,7 @@ static void process_header(struct mime_ctx *ctx, char *header)
 			v = p;
 		while (*p && *p != ';') p++;
 		if (*p) *p++ = '\0';
-		if (type == 1) {
+		if (type == CONTENT_TYPE) {
 			if (multipart && !strcasecmp(a, "boundary"))
 				entity->boundary = v;
 			else if (!strcasecmp(a, "charset"))

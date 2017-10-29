@@ -23,7 +23,7 @@ run: $(PROJ)
 	./tests
 
 tests: $(OBJS_COMMON)
-	$(LD) $(LDFLAGS) $(OBJS_COMMON)  -o $@
+	$(LD) $(LDFLAGS) $(OBJS_COMMON) -o $@
 
 tests.o: ../*.c ../*.h
 

@@ -67,7 +67,7 @@ static int whitelisted_charset(const char *charset)
 	return 0;
 }
 
-/* convert text from `enc' buffer to `dst' by `charset' (non-const) */
+/* convert text from `enc' buffer to `dst' by `charset' */
 void encoding_to_utf8(struct buffer *dst, struct buffer *enc, const char *charset)
 {
 	char *iptr = enc->start;
