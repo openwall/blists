@@ -126,6 +126,8 @@ static char *detect_url(char *what, char *colon, char *end,
 	return url;
 }
 
+/* Produces output of the same length as input, thus,
+ * Content-Length calculation could rely on that assumption. */
 static void buffer_append_obfuscate(struct buffer *dst, char *what,
 	size_t length)
 {
