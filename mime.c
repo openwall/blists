@@ -287,6 +287,7 @@ static inline int istokenchar(char ch)
 			return 1;
 	}
 }
+
 static inline int isencodedchar(unsigned char ch)
 {
 	/* rfc2047#section-2 encoded-text */
