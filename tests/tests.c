@@ -21,7 +21,7 @@
 #include "../encoding.c"
 #include "../mime.c"
 
-void test_decode_header(char *istr, char *ostr)
+static void test_decode_header(char *istr, char *ostr)
 {
 	struct buffer src, dst;
 	struct mime_ctx mime;
@@ -58,7 +58,7 @@ void test_decode_header(char *istr, char *ostr)
 	buffer_free(&dst);
 }
 
-void test_decode_header_inv(char *istr)
+static void test_decode_header_inv(char *istr)
 {
 	char *ostr = strdup(istr);
 
@@ -66,7 +66,7 @@ void test_decode_header_inv(char *istr)
 	free(ostr);
 }
 
-void test_encoded_words(void)
+static void test_encoded_words(void)
 {
 	/* test encoded-word */
 	test_decode_header("test",			"test");
