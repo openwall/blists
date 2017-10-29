@@ -126,6 +126,37 @@ static char *detect_url(char *what, char *colon, char *end,
 	return url;
 }
 
+static void buffer_append_obfuscate(struct buffer *dst, char *what,
+	size_t length)
+{
+	char *ptr, *end;
+	unsigned char c;
+
+	ptr = what;
+	end = what + length;
+
+	while (ptr < end) {
+		switch ((c = (unsigned char)*ptr++)) {
+		case '\r':
+			break;
+		case '@':
+			if (ptr - what >= 2 &&
+			    end - ptr >= 4 &&
+			    *(ptr - 2) > ' ' &&
+			    *ptr > ' ' &&
+			    *(ptr + 1) > ' ' &&
+			    *(ptr + 2) > ' ') {
+				buffer_appends(dst, "@...");
+				ptr += 3;
+				break;
+			}
+			/* FALLTHRU */
+		default:
+			buffer_appendc(dst, c);
+		}
+	}
+}
+
 static void buffer_append_html_generic(struct buffer *dst, char *what,
 	size_t length, int quotes, int detect_urls)
 {
@@ -250,6 +281,35 @@ static int html_send(struct buffer *dst)
 	buffer_free(dst);
 
 	return 0;
+}
+
+static int is_attachment(struct mime_ctx *mime)
+{
+	/* count section as attachment if:
+	 * - it's type application/octet-stream;
+	 * - it's have name=/filename= set;
+	 * - no matter if content disposition is inline;
+	 */
+	if (mime->entities->filename ||
+	    !strcasecmp(mime->entities->type, "application/octet-stream"))
+		return 1;
+	return 0;
+}
+
+static int is_inline(struct mime_ctx *mime)
+{
+	/* show section only if:
+	 * - it does not have name=/filename= set, and
+	 * - it does not have disposition set, or
+	 * - it's disposition is inline;
+	 * - and it's type is text/ exlcuding text/html;
+	 */
+	if (!mime->entities->filename &&
+	    mime->entities->disposition != CONTENT_ATTACHMENT &&
+	    !strncasecmp(mime->entities->type, "text/", 5) &&
+	    strcasecmp(mime->entities->type, "text/html"))
+		return 1; /* show */
+	return 0; /* do not show */
 }
 
 int html_message(char *list,
@@ -440,7 +500,7 @@ int html_message(char *list,
 	}
 
 	if (html_flags & HTML_BODY) {
-		int attach_count = -1;
+		int attachment_count = 0;
 
 		if (prev) {
 			buffer_appends(&dst, "<a href=\"");
@@ -509,20 +569,27 @@ int html_message(char *list,
 			if (mime.entities->boundary)
 				body = NULL;
 			else {
-				attach_count++;
-				if (strncasecmp(mime.entities->type, "text/", 5) ||
-				    !strcasecmp(mime.entities->type, "text/html")) {
-					buffer_appends(&dst, "\n[ CONTENT OF TYPE ");
-					buffer_appends_html(&dst, mime.entities->type);
-					buffer_appendf(&dst, " <a href=\"%d/%d\""
-					    " rel=\"nofollow\""
-					    " download=\"%s-%u%02u%02u-%u-%d.txt\""
-					    ">DOWNLOAD</a> ",
-					    n, attach_count,
-					    list, y, m, d, n, attach_count);
-					if (mime.entities->filename)
+				if (is_attachment(&mime))
+					attachment_count++;
+				if (!is_inline(&mime)) {
+					buffer_appendf(&dst, "\n[ <a href=\"%d/%d\"",
+					    n, attachment_count);
+
+					/* attempt to stop search engines
+					 * to index binary attachments */
+					if (strncasecmp(mime.entities->type, "text/", 5))
+						buffer_appendf(&dst,
+						    " rel=\"nofollow\" download>Download");
+					else
+						buffer_appends(&dst, ">View");
+					if (mime.entities->filename) {
+						buffer_appends(&dst, " attachment ");
 						buffer_appends_html(&dst, mime.entities->filename);
-					buffer_appends(&dst, " ]\n");
+					}
+					buffer_appends(&dst, " of type ");
+					buffer_appends_html(&dst, mime.entities->type);
+					buffer_appendf(&dst, " (%d bytes)", mime.dst.ptr - body);
+					buffer_appends(&dst, "</a> ]\n");
 					body = NULL;
 				}
 			}
@@ -654,9 +721,9 @@ int html_attachment(char *list,
 	offset = idx_msg[1].offset;
 	size = idx_msg[1].size;
 
-	trunc = size > MAX_MESSAGE_SIZE;
+	trunc = size > MAX_WITH_ATTACHMENT_SIZE;
 	if (trunc)
-		size = MAX_MESSAGE_SIZE_TRUNC;
+		size = MAX_WITH_ATTACHMENT_SIZE;
 	if (buffer_init(&src, size)) {
 		free(list_file);
 		return html_error(NULL);
@@ -695,8 +762,10 @@ int html_attachment(char *list,
 	}
 	if (*src.ptr == '\n') body = ++src.ptr;
 
-	int attach_count = -1;
+	int attachment_count = 0;
 	do {
+		int text = 0;
+
 		if (mime.entities->boundary) {
 			body = mime_next_body_part(&mime);
 			if (!body || body >= src.end) break;
@@ -705,12 +774,25 @@ int html_attachment(char *list,
 		if (mime.entities->boundary)
 			body = NULL;
 		else {
-			attach_count++;
-			if (attach_count != a)
-				body= NULL;
-			else
-				buffer_appendf(&dst, "Content-Type: %s\n",
-				    mime.entities->type);
+			if (!is_attachment(&mime) ||
+			    ++attachment_count != a)
+				body = NULL;
+			else {
+
+				if (!strncasecmp(mime.entities->type, "text/", 5)) {
+					buffer_appends(&dst,
+					    "Content-Type: text/plain\n");
+					text++;
+				} else
+					buffer_appends(&dst,
+					    "Content-Type: application/octet-stream\n");
+				buffer_appendf(&dst,
+				    "Content-Disposition: %s;"
+				    " filename=\"%s-%u%02u%02u-%u-%d.%s\"\n",
+				    text? "inline" : "attachment",
+				    list, y, m, d, n, attachment_count,
+				    text? "txt" : "bin");
+			}
 		}
 		if (body) {
 			body = mime_decode_body(&mime);
@@ -725,7 +807,12 @@ int html_attachment(char *list,
 		buffer_appendf(&dst, "Content-Length: %llu\n",
 		    (unsigned long long)(mime.dst.ptr - body));
 		buffer_appendc(&dst, '\n');
-		buffer_append(&dst, body, mime.dst.ptr - body);
+		if (text)
+			buffer_append_obfuscate(&dst, body,
+			   mime.dst.ptr - body);
+		else
+			buffer_append(&dst, body, mime.dst.ptr - body);
+
 		mime.dst.ptr = body;
 	} while (bend < src.end && mime.entities);
 
