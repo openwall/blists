@@ -120,6 +120,7 @@ static void process_header(struct mime_ctx *ctx, char *header)
 	struct mime_entity *entity;
 	char *p, *a, *v;
 	int multipart = 0;
+	int type;
 
 	if (!strncasecmp(header, "Content-Transfer-Encoding:", 26)) {
 		p = header + 26;
@@ -128,20 +129,31 @@ static void process_header(struct mime_ctx *ctx, char *header)
 		return;
 	}
 
-	if (strncasecmp(header, "Content-Type:", 13)) return;
+	if (!strncasecmp(header, "Content-Type:", 13))
+		type = 1;
+	else if (!strncasecmp(header, "Content-Disposition:", 20))
+		type = 2;
+	else
+		return;
 
 	entity = ctx->entities;
-	entity->boundary = NULL;
+	if (type == 1) {
+		entity->boundary = NULL;
 
-	p = header + 13;
-	while (*p == ' ' || *p == '\t' || *p == '\n') p++;
-	entity->type = p;
-	while (*p && *p != ';') p++;
-	if (!*p) return;
+		p = header + 13;
+		while (*p == ' ' || *p == '\t' || *p == '\n') p++;
+		entity->type = p;
+		while (*p && *p != ';') p++;
+		if (!*p) return;
 
-	*p++ = '\0';
-	if (!strncasecmp(entity->type, "multipart/", 10))
-		multipart++;
+		*p++ = '\0';
+		if (!strncasecmp(entity->type, "multipart/", 10))
+			multipart++;
+	} else {
+		p = header + 20;
+		while (*p && *p != ';') p++;
+		if (!*p++) return;
+	}
 
 	do {
 		while (*p == ' ' || *p == '\t' || *p == '\n') p++;
@@ -158,12 +170,23 @@ static void process_header(struct mime_ctx *ctx, char *header)
 			v = p;
 		while (*p && *p != ';') p++;
 		if (*p) *p++ = '\0';
-		if (multipart && !strcasecmp(a, "boundary"))
-			entity->boundary = v;
-		else if (!strcasecmp(a, "charset"))
-			entity->charset = v;
-		if (entity->boundary && entity->charset)
-			return;
+		if (type == 1) {
+			if (multipart && !strcasecmp(a, "boundary"))
+				entity->boundary = v;
+			else if (!strcasecmp(a, "charset"))
+				entity->charset = v;
+			else if (!entity->filename &&
+			    !strcasecmp(a, "name"))
+				entity->filename = v;
+			if (entity->boundary && entity->charset &&
+			    entity->filename)
+				return;
+		} else {
+			if (!strcasecmp(a, "filename"))
+				entity->filename = v;
+			if (entity->filename)
+				return;
+		}
 	} while (1);
 }
 

@@ -517,9 +517,12 @@ int html_message(char *list,
 					buffer_appendf(&dst, " <a href=\"%d/%d\""
 					    " rel=\"nofollow\""
 					    " download=\"%s-%u%02u%02u-%u-%d.txt\""
-					    ">DOWNLOAD</a> ]\n",
+					    ">DOWNLOAD</a> ",
 					    n, attach_count,
 					    list, y, m, d, n, attach_count);
+					if (mime.entities->filename)
+						buffer_appends_html(&dst, mime.entities->filename);
+					buffer_appends(&dst, " ]\n");
 					body = NULL;
 				}
 			}

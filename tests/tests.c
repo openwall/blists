@@ -29,20 +29,20 @@ static void test_decode_header(char *istr, char *ostr)
 	size_t olen = strlen(ostr);
 
 	if (buffer_init(&src, 1024))
-		errx(1, " buffer_init(src) error\n");
+		errx(1, "  buffer_init(src) error\n");
 
 	if (buffer_init(&dst, 1024))
-		errx(1, " buffer_init(dst) error\n");
+		errx(1, "  buffer_init(dst) error\n");
 
 	if (mime_init(&mime, &src))
-		errx(1, " mime_init() error\n");
+		errx(1, "  mime_init() error\n");
 
 
 	buffer_append(&src, istr, ilen);
 	decode_header(&mime, src.start, ilen);
 
 	if (mime.dst.ptr - mime.dst.start != olen)
-		errx(1, " decode_header: incorrect output (`%s' -> `%.*s' [%d] vs `%s' [%d])\n",
+		errx(1, "  decode_header: incorrect output (`%s' -> `%.*s' [%d] vs `%s' [%d])\n",
 		    istr,
 		    mime.dst.ptr - mime.dst.start,
 		    mime.dst.start,
@@ -51,7 +51,7 @@ static void test_decode_header(char *istr, char *ostr)
 		    olen);
 
 
-	printf(" decode_header: [%s] OK\n", istr);
+	printf("  decode_header: [%s] OK\n", istr);
 
 	mime_free(&mime);
 	buffer_free(&src);
@@ -68,6 +68,7 @@ static void test_decode_header_inv(char *istr)
 
 static void test_encoded_words(void)
 {
+	printf(" Test decode_header(encoded-words)\n");
 	/* test encoded-word */
 	test_decode_header("test",			"test");
 	test_decode_header("=?utf-8?Q?test?=",		"test");
@@ -120,10 +121,83 @@ static void test_encoded_words(void)
 	    "=?utf-8?Q?1234567890123456789012345678901234567890123456789012345678901234?=");
 }
 
+static void test_process_header()
+{
+	struct buffer src, dst;
+	struct mime_ctx mime;
+	struct mime_entity *entity;
+	char *istr;
+
+	printf(" Test process_header()\n");
+
+	if (buffer_init(&src, 1024))
+		errx(1, "  buffer_init(src) error\n");
+
+	if (buffer_init(&dst, 1024))
+		errx(1, "  buffer_init(dst) error\n");
+
+	if (mime_init(&mime, &src))
+		errx(1, "  mime_init() error\n");
+
+	/* test #1 */
+	istr  = "Content-Type: text/x-log; charset=US-ASCII; name=log\n"
+		"Content-Transfer-Encoding: quoted-printable\n";
+	buffer_append(&src, istr, strlen(istr) + 1);
+	src.ptr = src.start;
+	mime_decode_header(&mime);
+	mime_decode_header(&mime);
+	entity = mime.entities;
+	if (!entity)
+		errx(1, "  entities is NULL\n");
+	if (!entity->type || strcmp(entity->type, "text/x-log"))
+		errx(1, "  type is wrong (%s)\n", entity->type);
+	if (!entity->charset || strcmp(entity->charset, "US-ASCII"))
+		errx(1, "  charset is wrong (%s)\n", entity->charset);
+	if (!entity->filename || strcmp(entity->filename, "log"))
+		errx(1, "  filename is wrong (%s)\n", entity->filename);
+	if (!entity->encoding ||
+	    strcmp(entity->encoding, "quoted-printable"))
+		errx(1, "  encoding is wrong (%s)\n", entity->encoding);
+	printf("  Test #1 Content-Type [text]: OK\n");
+
+	/* test #2 */
+	src.ptr = src.start;
+	istr  = "content-type: multipart/signed;"
+		" Charset=\"us-ascii\";"
+		" Boundary=\"=BOUNDARY=\"\n";
+	buffer_append(&src, istr, strlen(istr) + 1);
+	src.ptr = src.start;
+	mime_decode_header(&mime);
+	entity = mime.entities;
+	if (!entity->type || strcmp(entity->type, "multipart/signed"))
+		errx(1, "  type is wrong (%s)\n", entity->type);
+	if (!entity->charset || strcmp(entity->charset, "us-ascii"))
+		errx(1, "  charset is wrong (%s)\n", entity->charset);
+	if (!entity->boundary || strcmp(entity->boundary, "=BOUNDARY="))
+		errx(1, "  boundary is wrong (%s)\n", entity->boundary);
+	printf("  Test #2 Content-Type [multipart]: OK\n");
+
+	/* test #3 */
+	src.ptr = src.start;
+	istr  = "Content-Disposition: attachment; filename=smime.p7s\n";
+	buffer_append(&src, istr, strlen(istr) + 1);
+	src.ptr = src.start;
+	mime_decode_header(&mime);
+	entity = mime.entities;
+	if (!entity->filename || strcmp(entity->filename, "smime.p7s"))
+		errx(1, "  filename is wrong (%s)\n", entity->filename);
+	printf("  Test #3 Content-Disposition [filename]: OK\n");
+
+	mime_free(&mime);
+	buffer_free(&src);
+	buffer_free(&dst);
+}
+
 int main(int argc, char **argv)
 {
 	printf("Unit-test for blists\n");
 	test_encoded_words();
+	test_process_header();
 	printf("Success\n");
 	return 0;
 }

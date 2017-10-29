@@ -23,7 +23,7 @@
 
 struct mime_entity {
 	struct mime_entity *next;
-	char *type, *boundary, *encoding, *charset;
+	char *type, *boundary, *encoding, *charset, *filename;
 };
 
 struct mime_ctx {
