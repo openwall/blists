@@ -27,7 +27,8 @@ extern int html_flags;
  * error is assumed to be internal to the server and a fixed message is
  * output.
  */
-extern int html_error(char *msg);
+extern int html_error_real(char *file, int lineno, char *msg);
+#define html_error(x) html_error_real(__FILE__, __LINE__, x)
 
 /*
  * Loads the specified attachment and outputs it to stdout verbatim

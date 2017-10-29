@@ -248,21 +248,29 @@ static void buffer_append_header(struct buffer *dst, char *what)
 	buffer_appendc(dst, '\n');
 }
 
-int html_error(char *msg)
+int html_error_real(char *file, int lineno, char *msg)
 {
+	char loc[128];
+	char *msgt;
+
 	if (!msg)
 		msg = "Internal server error";
 
 	if (html_flags & HTML_HEADER)
-		msg = concat("\n<title>The request has failed: ", msg,
+		msgt = concat("\n<title>The request has failed: ", msg,
 		    "</title>\n"
 		    "<meta name=\"robots\" content=\"noindex\">\n", NULL);
 	else
-		msg = concat("\n<p>The request has failed: ", msg,
+		msgt = concat("\n<p>The request has failed: ", msg,
 		    ".\n", footer, NULL);
 
-	write_loop(STDOUT_FILENO, msg, strlen(msg));
-	free(msg);
+	write_loop(STDOUT_FILENO, msgt, strlen(msgt));
+	free(msgt);
+
+	snprintf(loc, sizeof(loc), " (%s:%d)", file, lineno);
+	msgt = concat("The request has failed: ", msg, loc, "\n", NULL);
+	write_loop(STDERR_FILENO, msgt, strlen(msgt));
+	free(msgt);
 
 	return 1;
 }
