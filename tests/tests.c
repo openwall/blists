@@ -42,9 +42,9 @@ static void test_decode_header(char *istr, char *ostr)
 	decode_header(&mime, src.start, ilen);
 
 	if (mime.dst.ptr - mime.dst.start != olen)
-		errx(1, "  decode_header: incorrect output (`%s' -> `%.*s' [%d] vs `%s' [%d])\n",
+		errx(1, "  decode_header: incorrect output (`%s' -> `%.*s' [%u] vs `%s' [%u])\n",
 		    istr,
-		    mime.dst.ptr - mime.dst.start,
+		    (int)(mime.dst.ptr - mime.dst.start),
 		    mime.dst.start,
 		    mime.dst.ptr - mime.dst.start,
 		    ostr,

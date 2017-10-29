@@ -11,8 +11,8 @@ CC = gcc
 LD = $(CC)
 RM = rm -f
 MKDIR = mkdir -p
-CFLAGS = -c -Wall -O2 -fomit-frame-pointer -D_FILE_OFFSET_BITS=64
-LDFLAGS = -s
+CFLAGS  = -ggdb -c -Wall -D_FILE_OFFSET_BITS=64
+LDFLAGS = -ggdb
 
 PROJ = bindex bit
 OBJS_COMMON = misc.o buffer.o mime.o encoding.o index.o
@@ -21,6 +21,7 @@ OBJS_BIT = bit.o html.o
 
 all: $(PROJ)
 
+check: all tests
 tests: test
 test:
 	make -C tests
@@ -49,3 +50,4 @@ md5/md5.o: md5/md5.c md5/md5.h
 
 clean:
 	$(RM) $(PROJ) $(OBJS_BINDEX) $(OBJS_BIT) $(OBJS_COMMON)
+	-make -C tests clean

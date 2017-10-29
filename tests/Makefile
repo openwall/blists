@@ -27,9 +27,6 @@ tests: $(OBJS_COMMON)
 
 tests.o: ../*.c ../*.h
 
-md5.o: ../md5/md5.c ../md5/md5.h
-	$(CC) $(CFLAGS) -c ../md5/md5.c -o md5.o
-
 .c.o:
 	$(CC) $(CFLAGS) $*.c
 
