@@ -285,11 +285,6 @@ static int html_send(struct buffer *dst)
 
 static int is_attachment(struct mime_ctx *mime)
 {
-	/* count section as attachment if:
-	 * - it's type application/octet-stream;
-	 * - it's have name=/filename= set;
-	 * - no matter if content disposition is inline;
-	 */
 	if (mime->entities->filename ||
 	    !strcasecmp(mime->entities->type, "application/octet-stream"))
 		return 1;
@@ -298,12 +293,6 @@ static int is_attachment(struct mime_ctx *mime)
 
 static int is_inline(struct mime_ctx *mime)
 {
-	/* show section only if:
-	 * - it does not have name=/filename= set, and
-	 * - it does not have disposition set, or
-	 * - it's disposition is inline;
-	 * - and it's type is text/ exlcuding text/html;
-	 */
 	if (!mime->entities->filename &&
 	    mime->entities->disposition != CONTENT_ATTACHMENT &&
 	    !strncasecmp(mime->entities->type, "text/", 5) &&
@@ -500,7 +489,7 @@ int html_message(char *list,
 	}
 
 	if (html_flags & HTML_BODY) {
-		int attachment_count = 0;
+		unsigned int attachment_count = 0;
 
 		if (prev) {
 			buffer_appends(&dst, "<a href=\"");
@@ -572,7 +561,7 @@ int html_message(char *list,
 				if (is_attachment(&mime))
 					attachment_count++;
 				if (!is_inline(&mime)) {
-					buffer_appendf(&dst, "\n[ <a href=\"%d/%d\"",
+					buffer_appendf(&dst, "\n[ <a href=\"%u/%u\"",
 					    n, attachment_count);
 
 					/* attempt to stop search engines
@@ -588,7 +577,6 @@ int html_message(char *list,
 					}
 					buffer_appends(&dst, " of type ");
 					buffer_appends_html(&dst, mime.entities->type);
-					buffer_appendf(&dst, " (%d bytes)", mime.dst.ptr - body);
 					buffer_appends(&dst, "</a> ]\n");
 					body = NULL;
 				}
@@ -762,7 +750,7 @@ int html_attachment(char *list,
 	}
 	if (*src.ptr == '\n') body = ++src.ptr;
 
-	int attachment_count = 0;
+	unsigned int attachment_count = 0;
 	do {
 		int text = 0;
 
@@ -778,20 +766,19 @@ int html_attachment(char *list,
 			    ++attachment_count != a)
 				body = NULL;
 			else {
-
 				if (!strncasecmp(mime.entities->type, "text/", 5)) {
 					buffer_appends(&dst,
 					    "Content-Type: text/plain\n");
-					text++;
+					text = 1;
 				} else
 					buffer_appends(&dst,
 					    "Content-Type: application/octet-stream\n");
 				buffer_appendf(&dst,
 				    "Content-Disposition: %s;"
-				    " filename=\"%s-%u%02u%02u-%u-%d.%s\"\n",
-				    text? "inline" : "attachment",
+				    " filename=\"%s-%u%02u%02u-%u-%u.%s\"\n",
+				    text ? "inline" : "attachment",
 				    list, y, m, d, n, attachment_count,
-				    text? "txt" : "bin");
+				    text ? "txt" : "bin");
 			}
 		}
 		if (body) {
