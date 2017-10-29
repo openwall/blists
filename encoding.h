@@ -18,8 +18,9 @@
 #define UTF8_CHARSET			"UTF-8"
 #define DEFAULT_CHARSET			"latin1"
 #define UNKNOWN_CHARSET			"latin1"
+#define MAX_CHARSET_LEN			70
 
-extern void encoding_to_utf8(struct buffer *dst, struct buffer *enc, char *charset);
+extern void encoding_to_utf8(struct buffer *dst, struct buffer *enc, const char *charset);
 extern int utf8_remove_trailing_partial_character(char *ptr, int *lenp);
 
 #endif

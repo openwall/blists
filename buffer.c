@@ -61,7 +61,7 @@ static int buffer_grow(struct buffer *buf, size_t length)
 	return 0;
 }
 
-int buffer_append(struct buffer *buf, char *what, size_t length)
+int buffer_append(struct buffer *buf, const char *what, size_t length)
 {
 	if (length > buf->end - buf->ptr &&
 	    buffer_grow(buf, length))
@@ -101,7 +101,7 @@ void buffer_appenduc(struct buffer *buf, unsigned int what)
 		buffer_appenduc(buf, 0xfffd); /* replacement character */
 }
 
-int buffer_appendf(struct buffer *buf, char *fmt, ...)
+int buffer_appendf(struct buffer *buf, const char *fmt, ...)
 {
 	va_list args;
 	size_t length, size;

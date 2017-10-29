@@ -168,7 +168,7 @@ static void process_header(struct mime_ctx *ctx, char *header)
 }
 
 /* from `encoded' to `dst' */
-static void decode_qp(struct buffer *dst, char *encoded, size_t length,
+static void decode_qp(struct buffer *dst, const char *encoded, size_t length,
     int header)
 {
 	unsigned char c, *p, *end;
@@ -211,7 +211,7 @@ static void decode_qp(struct buffer *dst, char *encoded, size_t length,
 }
 
 /* from `encoded' to `dst' */
-static void decode_base64(struct buffer *dst, char *encoded, size_t length)
+static void decode_base64(struct buffer *dst, const char *encoded, size_t length)
 {
 	unsigned char c, *p, *end;
 	unsigned int i, v;
@@ -311,16 +311,16 @@ static inline int islinearwhitespace(char ch)
 }
 
 /* decode mime-encoded-words, ex: =?charset?encoding?encoded_text?= */
-static void decode_header(struct mime_ctx *ctx, char *header, size_t length)
+static void decode_header(struct mime_ctx *ctx, const char *header, size_t length)
 {
-	char *done, *p, *q, *end, *charset, *encoding;
+	const char *done, *p, *q, *end, *encoding, *charset;
 	struct buffer *dst = &ctx->dst;
 
 	done = p = header;
 	end = header + length;
 
 	while (p < end) {
-		char *r;
+		const char *r;
 
 		if (*p++ != '=') continue;
 		if (p >= end) break;

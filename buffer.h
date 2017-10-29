@@ -30,10 +30,10 @@ struct buffer {
 extern int buffer_init(struct buffer *buf, size_t size);
 extern void buffer_free(struct buffer *buf);
 
-extern int buffer_append(struct buffer *buf, char *what, size_t length);
+extern int buffer_append(struct buffer *buf, const char *what, size_t length);
 extern int buffer_appendc(struct buffer *buf, char what);
 extern void buffer_appenduc(struct buffer *buf, unsigned int what);
-extern int buffer_appendf(struct buffer *buf, char *fmt, ...)
+extern int buffer_appendf(struct buffer *buf, const char *fmt, ...)
 #ifdef __GNUC__
 	__attribute__ ((format (printf, 2, 3)));
 #else

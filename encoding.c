@@ -68,25 +68,30 @@ static int whitelisted_charset(const char *charset)
 }
 
 /* convert text from `enc' buffer to `dst' by `charset' (non-const) */
-void encoding_to_utf8(struct buffer *dst, struct buffer *enc, char *charset)
+void encoding_to_utf8(struct buffer *dst, struct buffer *enc, const char *charset)
 {
 	char *iptr = enc->start;
 	size_t inlen = enc->ptr - enc->start;
-	char *p;
+	char charset_buf[MAX_CHARSET_LEN];
+	int i;
+	const char *p;
 
 	if (!charset)
 		charset = UNKNOWN_CHARSET;
 
 	/* sanitize charset string */
 	p = charset;
-	while ((*p >= 'a' && *p <= 'z') ||
-	    (*p >= 'A' && *p <= 'Z') ||
-	    (*p >= '0' && *p <= '9') ||
-	    (*p == '-'))
-		p++;
-	if (*p == '?')
-		*p = 0;
-	if (*p)
+	i = 0;
+	while (i < sizeof(charset_buf) - 1 &&
+	    ((*p >= 'a' && *p <= 'z') ||
+	     (*p >= 'A' && *p <= 'Z') ||
+	     (*p >= '0' && *p <= '9') ||
+	     (*p == '-')))
+		charset_buf[i++] = *p++;
+	if (*p == '?') {
+		charset_buf[i] = '\0';
+		charset = charset_buf;
+	} else
 		charset = UNKNOWN_CHARSET;
 
 	if (!strcasecmp(UTF8_CHARSET, charset) ||
