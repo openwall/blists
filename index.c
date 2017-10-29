@@ -73,6 +73,7 @@ int idx_open(const char *list)
 		errno = ESRCH; /* open() never returns this */
 		return -1;
 	}
+	errno = 0;
 	return fd;
 }
 
