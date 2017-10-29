@@ -155,6 +155,9 @@ static void test_process_header()
 		errx(1, "  charset is wrong (%s)\n", entity->charset);
 	if (!entity->filename || strcmp(entity->filename, "log"))
 		errx(1, "  filename is wrong (%s)\n", entity->filename);
+	if (entity->disposition != 0)
+		errx(1, "  disposition is wrong (%d)\n",
+		    entity->disposition);
 	if (!entity->encoding ||
 	    strcmp(entity->encoding, "quoted-printable"))
 		errx(1, "  encoding is wrong (%s)\n", entity->encoding);
@@ -175,6 +178,11 @@ static void test_process_header()
 		errx(1, "  charset is wrong (%s)\n", entity->charset);
 	if (!entity->boundary || strcmp(entity->boundary, "=BOUNDARY="))
 		errx(1, "  boundary is wrong (%s)\n", entity->boundary);
+	if (!entity->filename)
+		errx(1, "  filename is wrong (%s)\n", entity->filename);
+	if (entity->disposition != 0)
+		errx(1, "  disposition is wrong (%d)\n",
+		    entity->disposition);
 	printf("  Test #2 Content-Type [multipart]: OK\n");
 
 	/* test #3 */
@@ -184,8 +192,17 @@ static void test_process_header()
 	src.ptr = src.start;
 	mime_decode_header(&mime);
 	entity = mime.entities;
+	if (!entity->type || strcmp(entity->type, "multipart/signed"))
+		errx(1, "  type is wrong (%s)\n", entity->type);
+	if (!entity->charset || strcmp(entity->charset, "us-ascii"))
+		errx(1, "  charset is wrong (%s)\n", entity->charset);
+	if (!entity->boundary || strcmp(entity->boundary, "=BOUNDARY="))
+		errx(1, "  boundary is wrong (%s)\n", entity->boundary);
 	if (!entity->filename || strcmp(entity->filename, "smime.p7s"))
 		errx(1, "  filename is wrong (%s)\n", entity->filename);
+	if (entity->disposition != CONTENT_ATTACHMENT)
+		errx(1, "  disposition is wrong (%d)\n",
+		    entity->disposition);
 	printf("  Test #3 Content-Disposition [filename]: OK\n");
 
 	mime_free(&mime);

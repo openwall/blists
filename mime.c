@@ -29,11 +29,9 @@ static int new_entity(struct mime_ctx *ctx)
 	    !(entity = malloc(sizeof(*entity))))
 		return ctx->dst.error = -1;
 
+	memset(entity, 0, sizeof(*entity));
 	entity->next = ctx->entities;
 	entity->type = "text/plain";
-	entity->boundary = NULL;
-	entity->encoding = NULL;
-	entity->charset = NULL;
 	ctx->entities = entity;
 	ctx->depth++;
 
@@ -145,14 +143,22 @@ static void process_header(struct mime_ctx *ctx, char *header)
 		entity->type = p;
 		while (*p && *p != ';') p++;
 		if (!*p) return;
-
 		*p++ = '\0';
 		if (!strncasecmp(entity->type, "multipart/", 10))
 			multipart++;
 	} else {
+		char *disposition;
+
 		p = header + 20;
+		while (*p == ' ' || *p == '\t' || *p == '\n') p++;
+		disposition = p;
 		while (*p && *p != ';') p++;
-		if (!*p++) return;
+		if (!*p) return;
+		*p++ = '\0';
+		if (!strcasecmp(disposition, "inline"))
+			entity->disposition = CONTENT_INLINE;
+		else if (!strcasecmp(disposition, "attachment"))
+			entity->disposition = CONTENT_ATTACHMENT;
 	}
 
 	do {

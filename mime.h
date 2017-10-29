@@ -24,6 +24,7 @@
 struct mime_entity {
 	struct mime_entity *next;
 	char *type, *boundary, *encoding, *charset, *filename;
+	int disposition;
 };
 
 struct mime_ctx {
@@ -31,6 +32,8 @@ struct mime_ctx {
 	struct mime_entity *entities;
 	int depth;
 };
+
+enum { CONTENT_INLINE = 1, CONTENT_ATTACHMENT };
 
 extern int mime_init(struct mime_ctx *ctx, struct buffer *src);
 extern void mime_free(struct mime_ctx *ctx);
