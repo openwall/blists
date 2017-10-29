@@ -14,6 +14,7 @@
 #define HTML_HEADER			1
 #define HTML_BODY			2
 #define HTML_CENSOR			4
+#define HTML_ATTACHMENT			8
 
 #define MAX_SHORT_MSG_LIST		10
 #define MAX_RECENT_MSG_LIST		10
@@ -27,6 +28,13 @@ extern int html_flags;
  * output.
  */
 extern int html_error(char *msg);
+
+/*
+ * Loads the specified attachment and outputs it to stdout verbatim
+ */
+extern int html_attachment(char *list,
+	unsigned int y, unsigned int m, unsigned int d, unsigned int n,
+	unsigned int j);
 
 /*
  * Loads the specified message and outputs it to stdout with conversion

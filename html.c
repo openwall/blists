@@ -440,6 +440,8 @@ int html_message(char *list,
 	}
 
 	if (html_flags & HTML_BODY) {
+		int attach_count = -1;
+
 		if (prev) {
 			buffer_appends(&dst, "<a href=\"");
 			if (n == 1)
@@ -496,6 +498,7 @@ int html_message(char *list,
 			buffer_append_header(&dst, cc);
 		if (subject)
 			buffer_append_header(&dst, subject);
+
 		if (!(html_flags & HTML_CENSOR))
 		do {
 			if (mime.entities->boundary) {
@@ -505,13 +508,20 @@ int html_message(char *list,
 			}
 			if (mime.entities->boundary)
 				body = NULL;
-			else
-			if (strncasecmp(mime.entities->type, "text/", 5) ||
-			    !strcasecmp(mime.entities->type, "text/html")) {
-				buffer_appends(&dst, "\n[ CONTENT OF TYPE ");
-				buffer_appends_html(&dst, mime.entities->type);
-				buffer_appends(&dst, " SKIPPED ]\n");
-				body = NULL;
+			else {
+				attach_count++;
+				if (strncasecmp(mime.entities->type, "text/", 5) ||
+				    !strcasecmp(mime.entities->type, "text/html")) {
+					buffer_appends(&dst, "\n[ CONTENT OF TYPE ");
+					buffer_appends_html(&dst, mime.entities->type);
+					buffer_appendf(&dst, " <a href=\"%d/%d\""
+					    " rel=\"nofollow\""
+					    " download=\"%s-%u%02u%02u-%u[%d].txt\""
+					    ">DOWNLOAD</a> ]\n",
+					    n, attach_count,
+					    list, y, m, d, n, attach_count);
+					body = NULL;
+				}
 			}
 			if (body) {
 				body = mime_decode_body(&mime);
@@ -535,6 +545,184 @@ int html_message(char *list,
 		if (trunc)
 			buffer_appends(&dst, "[ TRUNCATED ]\n");
 	}
+
+	buffer_free(&src);
+
+	if (mime.dst.error || dst.error) {
+		mime_free(&mime);
+		buffer_free(&dst);
+		return html_error(NULL);
+	}
+
+	mime_free(&mime);
+
+	return html_send(&dst);
+}
+
+int html_attachment(char *list,
+	unsigned int y, unsigned int m, unsigned int d, unsigned int n,
+	unsigned int j)
+{
+	unsigned int aday, n0, n2;
+	char *list_file;
+	off_t idx_offset;
+	int fd, error, got, trunc, prev, next;
+	idx_msgnum_t m0, m1, m1r;
+	struct idx_message idx_msg[3];
+	idx_off_t offset;
+	idx_size_t size;
+	struct buffer src, dst;
+	struct mime_ctx mime;
+	char *body, *bend;
+
+	if (y < MIN_YEAR || y > MAX_YEAR ||
+	    m < 1 || m > 12 ||
+	    d < 1 || d > 31 ||
+	    n < 1 || n > 999999)
+		return html_error("Invalid date or message number");
+	aday = YMD2ADAY(y - MIN_YEAR, m, d);
+
+	list_file = concat(MAIL_SPOOL_PATH "/", list, NULL);
+	if (!list_file) return html_error(NULL);
+
+	fd = idx_open(list);
+	error = errno;
+	if (fd < 0) {
+		free(list_file);
+		return html_error(error == ENOENT ?
+		    "No such mailing list" : (error == ESRCH ?
+		    "Index needs rebuild" : NULL));
+	}
+
+	error = !idx_read_aday_ok(fd, aday, &m1, sizeof(m1));
+	if (error || m1 < 1 || m1 >= MAX_MAILBOX_MESSAGES) {
+		idx_close(fd);
+		free(list_file);
+		return html_error((error || m1 > 0) ? NULL : "No such message");
+	}
+	m1r = m1 + n - (1 + 1); /* both m1 and n are 1-based; m1r is 0-based */
+	idx_offset = IDX2MSG(m1r);
+	prev = next = 1;
+	if (m1r >= 1) {
+		idx_offset -= sizeof(idx_msg[0]);
+		got = idx_read(fd, idx_offset, &idx_msg, sizeof(idx_msg));
+		if (got != sizeof(idx_msg)) {
+			error = got != sizeof(idx_msg[0]) * 2;
+			idx_msg[2] = idx_msg[1];
+			next = 0;
+		}
+	} else {
+		prev = 0;
+		got = idx_read(fd, idx_offset, &idx_msg[1], sizeof(idx_msg[1]) * 2);
+		if (got != sizeof(idx_msg[1]) * 2) {
+			error = got != sizeof(idx_msg[1]);
+			idx_msg[2] = idx_msg[1];
+			next = 0;
+		}
+		idx_msg[0] = idx_msg[1];
+	}
+
+	n0 = n - 1;
+	if (!n0 && prev && !error) {
+		aday = YMD2ADAY(idx_msg[0].y, idx_msg[0].m, idx_msg[0].d);
+		error = !idx_read_aday_ok(fd, aday, &m0, sizeof(m0));
+		if (m1 > m0)
+			n0 = m1 - m0;
+		else
+			error = 1;
+	}
+
+	if (idx_close(fd) || error) {
+		free(list_file);
+		return html_error(got ? NULL : "No such message");
+	}
+
+	n2 = n + 1;
+	if (idx_msg[2].y != idx_msg[1].y ||
+	    idx_msg[2].m != m || idx_msg[2].d != d)
+		n2 = 1;
+
+	if (y - MIN_YEAR != idx_msg[1].y ||
+	    m != idx_msg[1].m || d != idx_msg[1].d) {
+		free(list_file);
+		return html_error("No such message");
+	}
+
+	offset = idx_msg[1].offset;
+	size = idx_msg[1].size;
+
+	trunc = size > MAX_MESSAGE_SIZE;
+	if (trunc)
+		size = MAX_MESSAGE_SIZE_TRUNC;
+	if (buffer_init(&src, size)) {
+		free(list_file);
+		return html_error(NULL);
+	}
+	if (buffer_init(&dst, size)) {
+		buffer_free(&src);
+		free(list_file);
+		return html_error(NULL);
+	}
+
+	fd = open(list_file, O_RDONLY);
+	free(list_file);
+	if (fd < 0) {
+		buffer_free(&dst);
+		buffer_free(&src);
+		return html_error("mbox open error");
+	}
+	error =
+	    lseek(fd, offset, SEEK_SET) != offset ||
+	    read_loop(fd, src.start, size) != size;
+	if (close(fd) || error || mime_init(&mime, &src)) {
+		buffer_free(&dst);
+		buffer_free(&src);
+		return html_error("mbox read error");
+	}
+
+	body = NULL;
+	while (src.end - src.ptr > 9 && *src.ptr != '\n') {
+		switch (*src.ptr) {
+			case 'C':
+			case 'c':
+				mime_decode_header(&mime);
+				continue;
+		}
+		mime_skip_header(&mime);
+	}
+	if (*src.ptr == '\n') body = ++src.ptr;
+
+	int attach_count = -1;
+	do {
+		if (mime.entities->boundary) {
+			body = mime_next_body_part(&mime);
+			if (!body || body >= src.end) break;
+			body = mime_next_body(&mime);
+		}
+		if (mime.entities->boundary)
+			body = NULL;
+		else {
+			attach_count++;
+			if (attach_count != j)
+				body= NULL;
+			else
+				buffer_appendf(&dst, "X-Content-Type: %s\n", mime.entities->type);
+		}
+		if (body) {
+			body = mime_decode_body(&mime);
+			if (!body) break;
+			bend = src.ptr;
+		} else {
+			bend = mime_skip_body(&mime);
+			if (!bend) break;
+			continue;
+		}
+
+		buffer_appendf(&dst, "Content-Length: %d\n", mime.dst.ptr - body);
+		buffer_appendc(&dst, '\n');
+		buffer_append(&dst, body, mime.dst.ptr - body);
+		mime.dst.ptr = body;
+	} while (bend < src.end && mime.entities);
 
 	buffer_free(&src);
 
