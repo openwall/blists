@@ -33,7 +33,7 @@ struct mime_ctx {
 	int depth;
 };
 
-enum { CONTENT_INLINE = 1, CONTENT_ATTACHMENT };
+enum { CONTENT_UNSET = 0, CONTENT_INLINE, CONTENT_ATTACHMENT };
 
 extern int mime_init(struct mime_ctx *ctx, struct buffer *src);
 extern void mime_free(struct mime_ctx *ctx);
