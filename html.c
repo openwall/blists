@@ -516,7 +516,7 @@ int html_message(char *list,
 					buffer_appends_html(&dst, mime.entities->type);
 					buffer_appendf(&dst, " <a href=\"%d/%d\""
 					    " rel=\"nofollow\""
-					    " download=\"%s-%u%02u%02u-%u[%d].txt\""
+					    " download=\"%s-%u%02u%02u-%u-%d.txt\""
 					    ">DOWNLOAD</a> ]\n",
 					    n, attach_count,
 					    list, y, m, d, n, attach_count);
@@ -561,7 +561,7 @@ int html_message(char *list,
 
 int html_attachment(char *list,
 	unsigned int y, unsigned int m, unsigned int d, unsigned int n,
-	unsigned int j)
+	unsigned int a)
 {
 	unsigned int aday, n0, n2;
 	char *list_file;
@@ -703,10 +703,11 @@ int html_attachment(char *list,
 			body = NULL;
 		else {
 			attach_count++;
-			if (attach_count != j)
+			if (attach_count != a)
 				body= NULL;
 			else
-				buffer_appendf(&dst, "X-Content-Type: %s\n", mime.entities->type);
+				buffer_appendf(&dst, "Content-Type: %s\n",
+				    mime.entities->type);
 		}
 		if (body) {
 			body = mime_decode_body(&mime);
@@ -718,7 +719,8 @@ int html_attachment(char *list,
 			continue;
 		}
 
-		buffer_appendf(&dst, "Content-Length: %d\n", mime.dst.ptr - body);
+		buffer_appendf(&dst, "Content-Length: %llu\n",
+		    (unsigned long long)(mime.dst.ptr - body));
 		buffer_appendc(&dst, '\n');
 		buffer_append(&dst, body, mime.dst.ptr - body);
 		mime.dst.ptr = body;

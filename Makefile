@@ -21,6 +21,7 @@ OBJS_BIT = bit.o html.o
 
 all: $(PROJ)
 
+tests: test
 test:
 	make -C tests
 

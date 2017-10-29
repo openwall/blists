@@ -34,7 +34,7 @@ extern int html_error(char *msg);
  */
 extern int html_attachment(char *list,
 	unsigned int y, unsigned int m, unsigned int d, unsigned int n,
-	unsigned int j);
+	unsigned int a);
 
 /*
  * Loads the specified message and outputs it to stdout with conversion

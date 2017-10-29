@@ -17,9 +17,10 @@
 int main(int argc, char **argv)
 {
 	char *list, *p, nul, slash;
-	unsigned int y, m, d, n, j;
+	unsigned int y, m, d, n, a;
 
-	if (argc < 1 || argc > 3) return html_error(NULL);
+	if (argc < 1 || argc > 3)
+		return html_error(NULL);
 
 	if (argc >= 2) {
 		if (!strcmp(argv[1], "header"))
@@ -33,9 +34,10 @@ int main(int argc, char **argv)
 		else if (!strcmp(argv[1], "attachment"))
 			html_flags = HTML_ATTACHMENT;
 		else
-			return html_error(argv[1]);
+			return html_error(NULL);
 	}
 
+	list = NULL;
 	if (html_flags != HTML_ATTACHMENT) {
 		p = getenv("SERVER_PROTOCOL");
 		if (!p || strcmp(p, "INCLUDED"))
@@ -45,7 +47,8 @@ int main(int argc, char **argv)
 		if (argc > 2)
 			list = argv[2];
 	}
-	if (!list) return html_error(NULL);
+	if (!list)
+		return html_error(NULL);
 
 	for (p = list; *p; p++) {
 		if (p - list > 99) goto bad_syntax;
@@ -58,8 +61,8 @@ int main(int argc, char **argv)
 	*p++ = '\0';
 
 	nul = '\0';
-	if (sscanf(p, "%u/%u/%u/%u/%u%c", &y, &m, &d, &n, &j, &nul) >= 5 && !nul)
-		return html_attachment(list, y, m, d, n, j);
+	if (sscanf(p, "%u/%u/%u/%u/%u%c", &y, &m, &d, &n, &a, &nul) >= 5 && !nul)
+		return html_attachment(list, y, m, d, n, a);
 
 	if (sscanf(p, "%u/%u/%u/%u%c", &y, &m, &d, &n, &nul) >= 4 && !nul)
 		return html_message(list, y, m, d, n);

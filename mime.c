@@ -311,7 +311,7 @@ static inline int islinearwhitespace(char ch)
 }
 
 /* decode mime-encoded-words, ex: =?charset?encoding?encoded_text?= */
-void decode_header(struct mime_ctx *ctx, char *header, size_t length)
+static void decode_header(struct mime_ctx *ctx, char *header, size_t length)
 {
 	char *done, *p, *q, *end, *charset, *encoding;
 	struct buffer *dst = &ctx->dst;

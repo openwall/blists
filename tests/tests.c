@@ -79,9 +79,9 @@ void test_encoded_words(void)
 	test_decode_header("=?Utf-8?Q?=20test?= ",	" test ");
 	test_decode_header(" =?Utf-8?Q?=20test?=",	"  test");
 	test_decode_header("==?utf-8?Q?test?==",	"=test=");
-	test_decode_header("=?invalud?Q?test?=",	"test"); // unknown encoding
+	test_decode_header("=?invalid?Q?test?=",	"test"); // unknown encoding
 
-	/* test in russian */
+	/* encoded text is "test" in Russian */
 	test_decode_header("=?koi8-r?B?1MXT1A==?=",     "\xd1\x82\xd0\xb5\xd1\x81\xd1\x82");
 	test_decode_header("=?KOI8-R?Q?=D4=C5=D3=D4?=", "\xd1\x82\xd0\xb5\xd1\x81\xd1\x82");
 	test_decode_header("=?CP1251?q?=F2=E5=F1=F2?=", "\xd1\x82\xd0\xb5\xd1\x81\xd1\x82");
@@ -111,11 +111,11 @@ void test_encoded_words(void)
 	test_decode_header_inv("=?utf-8??test?=");
 	test_decode_header_inv("=?utf-8?Q?\?=");
 
-	// not too long encoded-word (75 bytes)
+	/* not too long encoded-word (75 bytes) */
 	test_decode_header(
 	    "=?utf-8?Q?123456789012345678901234567890123456789012345678901234567890123?=",
 	              "123456789012345678901234567890123456789012345678901234567890123");
-	// too long encoded-word (76 bytes)
+	/* too long encoded-word (76 bytes) */
 	test_decode_header_inv(
 	    "=?utf-8?Q?1234567890123456789012345678901234567890123456789012345678901234?=");
 }
