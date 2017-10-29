@@ -571,8 +571,8 @@ int html_message(char *list,
 						    " rel=\"nofollow\" download>Download");
 					else
 						buffer_appends(&dst, ">View");
+					buffer_appends(&dst, " attachment ");
 					if (mime.entities->filename) {
-						buffer_appends(&dst, " attachment ");
 						buffer_appends_html(&dst, mime.entities->filename);
 					}
 					buffer_appends(&dst, " of type ");
