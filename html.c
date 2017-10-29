@@ -248,7 +248,7 @@ static void buffer_append_header(struct buffer *dst, char *what)
 	buffer_appendc(dst, '\n');
 }
 
-int html_error_real(char *file, int lineno, char *msg)
+int html_error_real(const char *file, int lineno, const char *msg)
 {
 	char loc[128];
 	char *msgt;
