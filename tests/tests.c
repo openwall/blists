@@ -37,19 +37,17 @@ static void test_decode_header(char *istr, char *ostr)
 	if (mime_init(&mime, &src))
 		errx(1, "  mime_init() error\n");
 
-
 	buffer_append(&src, istr, ilen);
 	decode_header(&mime, src.start, ilen);
 
 	if (mime.dst.ptr - mime.dst.start != olen)
-		errx(1, "  decode_header: incorrect output (`%s' -> `%.*s' [%u] vs `%s' [%u])\n",
+		errx(1, "  decode_header: incorrect output (`%s' -> `%.*s' [%llu] vs `%s' [%llu])\n",
 		    istr,
-		    (int)(mime.dst.ptr - mime.dst.start),
-		    mime.dst.start,
-		    mime.dst.ptr - mime.dst.start,
+		    (int)(mime.dst.ptr - mime.dst.start), /* hack only suitable for tests */
+		    mime.dst.start, /* not NUL terminated; works due to the hack above */
+		    (unsigned long long)(mime.dst.ptr - mime.dst.start),
 		    ostr,
-		    olen);
-
+		    (unsigned long long)olen);
 
 	printf("  decode_header: [%s] OK\n", istr);
 
@@ -87,7 +85,7 @@ static void test_encoded_words(void)
 	test_decode_header("=?KOI8-R?Q?=D4=C5=D3=D4?=", "\xd1\x82\xd0\xb5\xd1\x81\xd1\x82");
 	test_decode_header("=?CP1251?q?=F2=E5=F1=F2?=", "\xd1\x82\xd0\xb5\xd1\x81\xd1\x82");
 
-	/* from rfc2047 */ 
+	/* from rfc2047 */
 	test_decode_header("(=?ISO-8859-1?Q?a?=)",			 "(a)");
 	test_decode_header("(=?ISO-8859-1?Q?a?= b)",			 "(a b)");
 	test_decode_header("(=?ISO-8859-1?Q?a?= =?ISO-8859-1?Q?b?=)",	 "(ab)");
@@ -155,7 +153,7 @@ static void test_process_header()
 		errx(1, "  charset is wrong (%s)\n", entity->charset);
 	if (!entity->filename || strcmp(entity->filename, "log"))
 		errx(1, "  filename is wrong (%s)\n", entity->filename);
-	if (entity->disposition != 0)
+	if (entity->disposition != CONTENT_UNSET)
 		errx(1, "  disposition is wrong (%d)\n",
 		    entity->disposition);
 	if (!entity->encoding ||
@@ -180,7 +178,7 @@ static void test_process_header()
 		errx(1, "  boundary is wrong (%s)\n", entity->boundary);
 	if (!entity->filename)
 		errx(1, "  filename is wrong (%s)\n", entity->filename);
-	if (entity->disposition != 0)
+	if (entity->disposition != CONTENT_UNSET)
 		errx(1, "  disposition is wrong (%d)\n",
 		    entity->disposition);
 	printf("  Test #2 Content-Type [multipart]: OK\n");

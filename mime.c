@@ -26,10 +26,9 @@ static int new_entity(struct mime_ctx *ctx)
 	struct mime_entity *entity;
 
 	if (ctx->depth >= MIME_DEPTH_MAX ||
-	    !(entity = malloc(sizeof(*entity))))
+	    !(entity = calloc(1, sizeof(*entity))))
 		return ctx->dst.error = -1;
 
-	memset(entity, 0, sizeof(*entity));
 	entity->next = ctx->entities;
 	entity->type = "text/plain";
 	ctx->entities = entity;

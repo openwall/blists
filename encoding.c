@@ -39,7 +39,7 @@ static int simple_tolower(char ch)
 
 static int match_charset(const char *charset, const char *mask)
 {
-	int i;
+	unsigned int i;
 
 	for (; *mask; mask++, charset++) {
 		if (*mask == '$')
@@ -73,7 +73,7 @@ void encoding_to_utf8(struct buffer *dst, struct buffer *enc, const char *charse
 	char *iptr = enc->start;
 	size_t inlen = enc->ptr - enc->start;
 	char charset_buf[MAX_CHARSET_LEN];
-	int i;
+	size_t i;
 	const char *p;
 
 	if (!charset)

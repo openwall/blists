@@ -31,7 +31,7 @@ extern int html_error_real(const char *file, int lineno, const char *msg);
 #define html_error(x) html_error_real(__FILE__, __LINE__, x)
 
 /*
- * Loads the specified attachment and outputs it to stdout verbatim
+ * Loads the specified attachment and outputs it to stdout verbatim.
  */
 extern int html_attachment(char *list,
 	unsigned int y, unsigned int m, unsigned int d, unsigned int n,
