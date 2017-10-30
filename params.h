@@ -29,9 +29,9 @@
  * Truncate messages larger than the maximum size at the (possibly lower)
  * truncation point.
  */
-#define MAX_MESSAGE_SIZE		(1024 * 1024)
-#define MAX_MESSAGE_SIZE_TRUNC		(100 * 1024)
-#define MAX_WITH_ATTACHMENT_SIZE	(30 * 1024 * 1024)
+#define MAX_MESSAGE_SIZE		(100 * 1024 * 1024)
+#define MAX_MESSAGE_SIZE_TRUNC		(10 * 1024 * 1024)
+#define MAX_WITH_ATTACHMENT_SIZE	(100 * 1024 * 1024)
 
 /*
  * Don't turn URLs longer than this number of characters into hyperlinks.
