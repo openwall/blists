@@ -44,6 +44,7 @@ SSI-enabled HTML file (usually with extension .shtml):
     <!--#include virtual="/cgi-bin/bit?header"-->
     <style type="text/css">
     .cal_brief { text-align: center; }
+    .cal_brief td:first-child { background: inherit; }
     .cal_brief td { background: #ccc; width: 5ex; padding: 2px; }
     .cal_big { text-align: center; padding: 0; margin: 0; }
     .cal_big td { padding: 0 2px; }
