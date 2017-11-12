@@ -88,7 +88,7 @@ void encoding_to_utf8(struct buffer *dst, struct buffer *enc, const char *charse
 	     (*p >= '0' && *p <= '9') ||
 	     (*p == '-')))
 		charset_buf[i++] = *p++;
-	if (*p == '?') {
+	if (!*p || *p == '?') {
 		charset_buf[i] = '\0';
 		charset = charset_buf;
 	} else

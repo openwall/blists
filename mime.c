@@ -533,10 +533,11 @@ char *mime_skip_body(struct mime_ctx *ctx)
 /* consume body in src, and return pointer in ctx->dst to the beginning
  * of decoded body (until the ctx->dst->ptr);
  * pointer to end of the body is written to bendp */
-char *mime_decode_body(struct mime_ctx *ctx, char **bendp)
+char *mime_decode_body(struct mime_ctx *ctx, mime_recode_t recode, char **bendp)
 {
 	char *body, *bend, *encoding, *charset;
 	size_t length, dst_offset;
+	struct buffer *dst;
 
 	encoding = ctx->entities->encoding;
 	charset = ctx->entities->charset;
@@ -552,13 +553,18 @@ char *mime_decode_body(struct mime_ctx *ctx, char **bendp)
 
 	dst_offset = ctx->dst.ptr - ctx->dst.start;
 
-	if (encoding && !strcasecmp(encoding, "quoted-printable"))
-		decode_qp(&ctx->enc, body, length, 0);
-	else if (encoding && !strcasecmp(encoding, "base64"))
-		decode_base64(&ctx->enc, body, length);
+	if (recode == RECODE_YES)
+		dst = &ctx->enc;
 	else
-		buffer_append(&ctx->enc, body, length);
-	encoding_to_utf8(&ctx->dst, &ctx->enc, charset);
+		dst = &ctx->dst;
+	if (encoding && !strcasecmp(encoding, "quoted-printable"))
+		decode_qp(dst, body, length, 0);
+	else if (encoding && !strcasecmp(encoding, "base64"))
+		decode_base64(dst, body, length);
+	else
+		buffer_append(dst, body, length);
+	if (recode == RECODE_YES)
+		encoding_to_utf8(&ctx->dst, &ctx->enc, charset);
 	if (ctx->dst.error)
 		return NULL;
 

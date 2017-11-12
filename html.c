@@ -605,7 +605,7 @@ int html_message(char *list,
 				}
 			}
 			if (body) {
-				body = mime_decode_body(&mime, NULL);
+				body = mime_decode_body(&mime, RECODE_YES, NULL);
 				if (!body) break;
 				bend = src.ptr;
 			} else {
@@ -772,7 +772,7 @@ int html_attachment(char *list,
 			}
 		}
 		if (body) {
-			body = mime_decode_body(&mime, &bend);
+			body = mime_decode_body(&mime, RECODE_NO, &bend);
 			if (bend >= src.end) {
 				dst.ptr = dst.start;
 				buffer_appendf(&dst,

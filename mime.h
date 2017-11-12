@@ -46,6 +46,7 @@ extern char *mime_decode_header(struct mime_ctx *ctx);
 extern char *mime_next_body_part(struct mime_ctx *ctx);
 extern char *mime_next_body(struct mime_ctx *ctx);
 extern char *mime_skip_body(struct mime_ctx *ctx);
-extern char *mime_decode_body(struct mime_ctx *ctx, char **bendp);
+typedef enum { RECODE_YES, RECODE_NO } mime_recode_t;
+extern char *mime_decode_body(struct mime_ctx *ctx, mime_recode_t recode, char **bendp);
 
 #endif
