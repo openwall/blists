@@ -1,0 +1,40 @@
+From list@lists.example.net  Sat Jun 11 11:11:11 2011
+Date: Sat, 11 Jun 2011 11:11:11 +0000
+From: user@example.net
+To: list@lists.example.net
+Content-Type: multipart/mixed;
+        boundary="=_105p769k0ny1"
+Content-Transfer-Encoding: 7bit
+
+This message is in MIME format.
+
+--=_105p769k0ny1
+Content-Type: text/plain;
+        charset=ISO-8859-7;
+        DelSp="Yes";
+        format="flowed"
+Content-Disposition: inline
+Content-Transfer-Encoding: 7bit
+
+header
+
+--=_105p769k0ny1
+Content-Type: text/x-patch;
+        charset=windows-1251;
+        name="test.diff"
+Content-Disposition: attachment;
+        filename="test.diff"
+Content-Transfer-Encoding: quoted-printable
+
+attachment
+
+--=_105p769k0ny1
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
+
+footer
+--=_105p769k0ny1--
+
+

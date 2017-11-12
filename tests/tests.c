@@ -11,15 +11,20 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <err.h>
 
 #include "../buffer.h"
 #include "../encoding.h"
 #include "../mime.h"
+#include "../misc.h"
 
 #include "../buffer.c"
 #include "../encoding.c"
 #include "../mime.c"
+#include "../misc.c"
 
 static void test_decode_header(char *istr, char *ostr)
 {
@@ -208,11 +213,117 @@ static void test_process_header()
 	buffer_free(&dst);
 }
 
+static void test_multipart()
+{
+	struct buffer src;
+	struct mime_ctx mime;
+	struct stat stat;
+	char *body, *bend = NULL;
+	size_t size;
+	unsigned int part;
+
+	printf(" Test mime decoding(multipart)\n");
+	int fd = open("multipart.eml", O_RDONLY);
+	if (fd == -1)
+		err(1, "multipart.eml");
+	if (fstat(fd, &stat) == -1)
+		err(1, "multipart.eml");
+	size = stat.st_size;
+	if (buffer_init(&src, size))
+		errx(1, "  buffer_init(src) error\n");
+	if (read_loop(fd, src.start, size) != size)
+		errx(1, "multipart.eml read error");
+	if (mime_init(&mime, &src))
+		errx(1, "  mime_init() error\n");
+
+	body = NULL;
+	while (src.end - src.ptr > 9 && *src.ptr != '\n') {
+		switch (*src.ptr) {
+			case 'C':
+			case 'c':
+				mime_decode_header(&mime);
+				continue;
+		}
+		mime_skip_header(&mime);
+	}
+	if (*src.ptr == '\n')
+	       	body = ++src.ptr;
+
+	part = 0;
+	do {
+		char *text;
+		char *ctype;
+		char *charset;
+
+		if (mime.entities->boundary) {
+			body = mime_next_body_part(&mime);
+			if (!body || body >= src.end)
+				break;
+			body = mime_next_body(&mime);
+		}
+		if (mime.entities->boundary)
+			body = NULL;
+		else
+			part++;
+		switch (part) {
+		case 1:
+			text    = "header\n";
+			ctype   = "text/plain";
+			charset = "ISO-8859-7";
+			break;
+		case 2:
+			text    = "attachment\n";
+			ctype   = "text/x-patch";
+			charset = "windows-1251";
+			break;
+		case 3:
+			text    = "footer\n";
+			ctype   = "text/plain";
+			charset = "us-ascii";
+			break;
+		default:
+			errx(1, "  invlid mime section\n");
+		}
+		if (body) {
+			if (strcmp(charset, mime.entities->charset))
+				errx(1, "  mime decoding error (wrong charset %s)\n",
+				    mime.entities->charset);
+			if (strcmp(ctype, mime.entities->type))
+				errx(1, "  mime decoding error (wrong type %s)\n",
+				    mime.entities->type);
+
+			/* frees mime.entities struct */
+			body = mime_decode_body(&mime, RECODE_NO, NULL);
+			if (!body)
+				break;
+			bend = src.ptr;
+		} else {
+			bend = mime_skip_body(&mime);
+			if (!bend)
+				break;
+			continue;
+		}
+
+		if (strncmp(text, body, strlen(text)))
+			errx(1, "  mime decoding error (wrong content)\n");
+		else
+			printf("  mime decode part #%d OK\n", part);
+
+		mime.dst.ptr = body;
+	} while (bend < src.end && mime.entities);
+
+	if (part != 3)
+		errx(1, "  mime decoding error (too few secrions)\n");
+	buffer_free(&src);
+	mime_free(&mime);
+}
+
 int main(int argc, char **argv)
 {
 	printf("Unit-test for blists\n");
 	test_encoded_words();
 	test_process_header();
+	test_multipart();
 	printf("Success\n");
 	return 0;
 }
