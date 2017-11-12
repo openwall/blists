@@ -1000,6 +1000,15 @@ int html_day_index(char *list, unsigned int y, unsigned int m, unsigned int d)
 	return html_send(&dst);
 }
 
+/* Tomohiko Sakamoto algorithm */
+static int dayofweek(unsigned int y, unsigned int m, unsigned int d)
+{
+	static int t[] = {0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4};
+
+	y -= m < 3;
+	return (y + y/4 - y/100 + y/400 + t[m-1] + d) % 7;
+}
+
 int html_month_index(char *list, unsigned int y, unsigned int m)
 {
 	unsigned int d, n, aday, dp;
@@ -1112,8 +1121,62 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 		if (!total || !msg) {
 			buffer_free(&dst);
 			free(msgp);
-			return html_error("No messages for this day.");
+			return html_error("No messages for this month.");
 		}
+
+		buffer_appends(&dst,
+		    "\n<table border=0 class=calendb style=\"text-align: right;\"><tr>"
+		    "<th>Sun<th>Mon<th>Tue<th>Wed<th>Thu<th>Fri<th>Sat");
+
+		int leapyear = y % 4 || (y % 100 == 0 && y % 400) ? 0 : 1;
+		int daysinmonth = m == 2 ? 28 + leapyear : 31 - (m - 1) % 7 % 2;
+		int firstday = dayofweek(y, m, 1);
+		int lastday  = dayofweek(y, m, daysinmonth);
+
+		dp = 0;
+		mp = mn[0];
+		for (n = 1; n <= daysinmonth + firstday; n++) {
+			int d = n - firstday;
+
+			if (n % 7 == 1)
+				buffer_appends(&dst, "\n<tr>");
+			if (n == 1 && d < 1 && firstday > 0)
+				buffer_appendf(&dst,
+				    "<td class=cspan colspan=\"%d\">",
+				    firstday);
+			if (d > 0) {
+				buffer_appendf(&dst,
+				    "<td class=ccell>"
+				    "<sup style=\"color: #F0F0F0; text-align: left; float: left;\">"
+				    "<b>%d</b></sup> ",
+				    d);
+				if (mn[d]) {
+					if (mp > 0) {
+						if (mn[d] > 0)
+							count = mn[d] - mp;
+						else
+							count = -mn[d];
+						if (count <= 0) {
+							buffer_free(&dst);
+							free(msgp);
+							return html_error(NULL);
+						}
+						buffer_appendf(&dst,
+						    "<a href=\"%02u/\">%u</a>",
+						    dp + 1, count);
+					}
+					mp = mn[d];
+					dp = d;
+				}
+			}
+			if (d == daysinmonth) {
+				buffer_appendf(&dst,
+				    "<td class=cspan colspan=\"%d\">",
+				    7 - lastday - 1);
+				break;
+			}
+		}
+		buffer_appends(&dst, "\n</table>\n");
 
 		total = 0;
 		dp = 0;
