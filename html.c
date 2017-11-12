@@ -407,16 +407,9 @@ int html_message(char *list,
 		free(list_file);
 		return html_error(NULL);
 	}
-	if (buffer_init(&dst, size)) {
-		buffer_free(&src);
-		free(list_file);
-		return html_error(NULL);
-	}
-
 	fd = open(list_file, O_RDONLY);
 	free(list_file);
 	if (fd < 0) {
-		buffer_free(&dst);
 		buffer_free(&src);
 		return html_error("mbox open error");
 	}
@@ -424,9 +417,13 @@ int html_message(char *list,
 	    lseek(fd, offset, SEEK_SET) != offset ||
 	    read_loop(fd, src.start, size) != size;
 	if (close(fd) || error || mime_init(&mime, &src)) {
-		buffer_free(&dst);
 		buffer_free(&src);
 		return html_error("mbox read error");
+	}
+	if (buffer_init(&dst, size)) {
+		buffer_free(&src);
+		free(list_file);
+		return html_error(NULL);
 	}
 
 	date = from = to = cc = subject = body = NULL;
@@ -593,7 +590,7 @@ int html_message(char *list,
 				}
 			}
 			if (body) {
-				body = mime_decode_body(&mime);
+				body = mime_decode_body(&mime, NULL);
 				if (!body) break;
 				bend = src.ptr;
 			} else {
@@ -697,16 +694,9 @@ int html_attachment(char *list,
 		free(list_file);
 		return html_error(NULL);
 	}
-	if (buffer_init(&dst, size)) {
-		buffer_free(&src);
-		free(list_file);
-		return html_error(NULL);
-	}
-
 	fd = open(list_file, O_RDONLY);
 	free(list_file);
 	if (fd < 0) {
-		buffer_free(&dst);
 		buffer_free(&src);
 		return html_error("mbox open error");
 	}
@@ -714,9 +704,13 @@ int html_attachment(char *list,
 	    lseek(fd, offset, SEEK_SET) != offset ||
 	    read_loop(fd, src.start, size) != size;
 	if (close(fd) || error || mime_init(&mime, &src)) {
-		buffer_free(&dst);
 		buffer_free(&src);
 		return html_error("mbox read error");
+	}
+	if (buffer_init(&dst, size)) {
+		buffer_free(&src);
+		free(list_file);
+		return html_error(NULL);
 	}
 
 	body = NULL;
@@ -763,7 +757,14 @@ int html_attachment(char *list,
 			}
 		}
 		if (body) {
-			body = mime_decode_body(&mime);
+			body = mime_decode_body(&mime, &bend);
+			if (bend >= src.end) {
+				dst.ptr = dst.start;
+				buffer_appendf(&dst,
+				    "Status: 404 Not found\n\n"
+				    "Attachment is truncated.\n");
+				break;
+			}
 			if (!body) break;
 			bend = src.ptr;
 		} else {

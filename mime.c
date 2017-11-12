@@ -43,6 +43,9 @@ int mime_init(struct mime_ctx *ctx, struct buffer *src)
 	ctx->depth = 0;
 	ctx->src = src;
 
+	/* src: input data (from ptr to end)
+	 * dst: decoded data (from start to ptr)
+	 * enc: small intermediate iconv buffer */
 	if (buffer_init(&ctx->dst, src->end - src->ptr)) return -1;
 	if (buffer_init(&ctx->enc, ICONV_BUF_SIZE)) return -1;
 
@@ -73,8 +76,10 @@ void mime_free(struct mime_ctx *ctx)
 	buffer_free(&ctx->dst);
 }
 
-/* eat one header out of src, multi-line if need,
- * return pointer to it */
+/* advance src->ptr to consume single header (multi-line if need),
+ * and return pointer to it, NULL if headers are over;
+ * src->ptr points to next header of end;
+ * does not modify src buffer data */
 char *mime_skip_header(struct mime_ctx *ctx)
 {
 	char *p, *q, *end;
@@ -339,6 +344,7 @@ static inline int islinearwhitespace(char ch)
 }
 
 /* decode mime-encoded-words, ex: =?charset?encoding?encoded_text?= */
+/* from header to ctx->dst */
 static void decode_header(struct mime_ctx *ctx, const char *header, size_t length)
 {
 	const char *done, *p, *q, *end, *encoding, *charset;
@@ -401,6 +407,9 @@ static void decode_header(struct mime_ctx *ctx, const char *header, size_t lengt
 }
 
 /* get(src), decode, and parse one header field (can be multi-line), put(dst) */
+/* mime_skip_header() + parse its content into dst + '\0',
+ * sometimes also destructively process its content;
+ * return pointer to the header in dst */
 char *mime_decode_header(struct mime_ctx *ctx)
 {
 	char *header;
@@ -429,7 +438,8 @@ char *mime_decode_header(struct mime_ctx *ctx)
 	return header;
 }
 
-/* find boundary separator, return pointer to it, or `end', or NULL(error) */
+/* find boundary separator (in src), return pointer to it, or `end',
+ * or NULL(error); may advance ctx->src->ptr */
 static char *find_next_boundary(struct mime_ctx *ctx, int pre)
 {
 	struct mime_entity *entity;
@@ -482,13 +492,14 @@ static char *find_next_boundary(struct mime_ctx *ctx, int pre)
 	return end;
 }
 
-/* find next mime part */
+/* find next mime part (in src) */
 char *mime_next_body_part(struct mime_ctx *ctx)
 {
 	return find_next_boundary(ctx, 0);
 }
 
-/* parse headers of current mime part and return pointer to its body */
+/* parse headers of current mime part and return pointer to its body
+ * (in src) */
 char *mime_next_body(struct mime_ctx *ctx)
 {
 	while (ctx->src->ptr < ctx->src->end) {
@@ -507,6 +518,8 @@ char *mime_next_body(struct mime_ctx *ctx)
 }
 
 /* don't parse this mime body */
+/* return pointer (in src) to the next mime part
+ * advance ctx->src->ptr to the same value */
 char *mime_skip_body(struct mime_ctx *ctx)
 {
 /* Forget the last non-multipart content type processed */
@@ -517,7 +530,10 @@ char *mime_skip_body(struct mime_ctx *ctx)
 }
 
 /* don't skip this mime body */
-char *mime_decode_body(struct mime_ctx *ctx)
+/* consume body in src, and return pointer in ctx->dst to the beginning
+ * of decoded body (until the ctx->dst->ptr);
+ * pointer to end of the body is written to bendp */
+char *mime_decode_body(struct mime_ctx *ctx, char **bendp)
 {
 	char *body, *bend, *encoding, *charset;
 	size_t length, dst_offset;
@@ -527,6 +543,8 @@ char *mime_decode_body(struct mime_ctx *ctx)
 
 	body = ctx->src->ptr;
 	bend = mime_skip_body(ctx);
+	if (bendp)
+		*bendp = bend;
 	if (!bend)
 		return NULL;
 
