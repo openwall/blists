@@ -43,9 +43,16 @@ SSI-enabled HTML file (usually with extension .shtml):
     <head>
     <!--#include virtual="/cgi-bin/bit?header"-->
     <style type="text/css">
-    .calendar { text-align: center; }
-    .ccell { background: #ccc; width: 5ex; padding: 2px; }
-    .csup { color: #F0F0F0; text-align: left; float: left; }
+    .cal_brief { text-align: center; }
+    .cal_brief td { background: #ccc; width: 5ex; padding: 2px; }
+    .cal_big { text-align: center; padding: 0; margin: 0; }
+    .cal_big td { padding: 0 2px; }
+    .cal_mon { text-align: center; }
+    .cal_mon th { font-size: small; padding: 0; margin: 0; }
+    .cal_mon td { background: #ccc; width: 5ex; height: 1.5em;
+                padding: 2px; white-space: nowrap; text-align: right; }
+    .cal_mon td[colspan] { background: inherit; }
+    .cal_mon sup { color: #F0F0F0; text-align: left; float: left; }
     </style>
     </head>
     <body>

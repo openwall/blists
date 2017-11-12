@@ -1014,6 +1014,62 @@ static int dayofweek(unsigned int y, unsigned int m, unsigned int d)
 	return (y + y/4 - y/100 + y/400 + t[m-1] + d) % 7;
 }
 
+static void html_output_month_cal(struct buffer *pdst, idx_msgnum_t *mn,
+    unsigned int y, unsigned int m)
+{
+	unsigned int d, dp;
+	idx_msgnum_t mp, count;
+
+	/* "Monday is the first day of the week according to the
+	 * international standard ISO 8601" */
+	enum { SUNDAY, MONDAY } weekstart = MONDAY;
+	buffer_appendf(pdst,
+	    "\n<table border=0 class=cal_mon><tr>"
+	    "%s<th>Mon<th>Tue<th>Wed<th>Thu<th>Fri<th>Sat%s",
+	    weekstart == SUNDAY ? "<th>Sun" : "",
+	    weekstart == MONDAY ? "<th>Sun" : "");
+
+	int leapyear = y % 4 || (y % 100 == 0 && y % 400) ? 0 : 1;
+	int daysinmonth = m == 2 ? 28 + leapyear : 31 - (m - 1) % 7 % 2;
+	int firstday = dayofweek(y, m, 1);
+
+	dp = 0;
+	mp = mn[0];
+	for (d = 1; d <= daysinmonth; d++) {
+		unsigned int col = (7 + d + firstday - weekstart - 1) % 7;
+
+		if (d == 1 || col == 0)
+			buffer_appends(pdst, "\n<tr>");
+		if (d == 1 && col > 0)
+			buffer_appendf(pdst,
+			    "<td colspan=\"%d\">",
+			    col);
+		buffer_appendf(pdst,
+		    "<td><sup><b>%d</b></sup> ",
+		    d);
+		if (mn[d]) {
+			if (mp > 0) {
+				if (mn[d] > 0)
+					count = mn[d] - mp;
+				else
+					count = -mn[d];
+				if (count <= 0)
+					return;
+				buffer_appendf(pdst,
+				    "<a href=\"%02u/\">%u</a>",
+				    dp + 1, count);
+			}
+			mp = mn[d];
+			dp = d;
+		}
+		if (d == daysinmonth && 7 - col - 1 > 0)
+			buffer_appendf(pdst,
+			    "<td colspan=\"%d\">",
+			    7 - col - 1);
+	}
+	buffer_appends(pdst, "\n</table>\n");
+}
+
 int html_month_index(char *list, unsigned int y, unsigned int m)
 {
 	unsigned int d, n, aday, dp;
@@ -1129,57 +1185,7 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 			return html_error("No messages for this month.");
 		}
 
-		/* "Monday is the first day of the week according to the
-		 * international standard ISO 8601" */
-		enum { SUNDAY, MONDAY } weekstart = MONDAY;
-		buffer_appendf(&dst,
-		    "\n<table border=0 class=calendb style=\"text-align: right;\"><tr>"
-		    "%s<th>Mon<th>Tue<th>Wed<th>Thu<th>Fri<th>Sat%s",
-		    weekstart == SUNDAY ? "<th>Sun" : "",
-		    weekstart == MONDAY ? "<th>Sun" : "");
-
-		int leapyear = y % 4 || (y % 100 == 0 && y % 400) ? 0 : 1;
-		int daysinmonth = m == 2 ? 28 + leapyear : 31 - (m - 1) % 7 % 2;
-		int firstday = dayofweek(y, m, 1);
-
-		dp = 0;
-		mp = mn[0];
-		for (d = 1; d <= daysinmonth; d++) {
-			unsigned int col = (7 + d + firstday - weekstart - 1) % 7;
-
-			if (d == 1 || col == 0)
-				buffer_appends(&dst, "\n<tr>");
-			if (d == 1 && col > 0)
-				buffer_appendf(&dst,
-				    "<td class=cspan colspan=\"%d\">",
-				    col);
-			buffer_appendf(&dst,
-			    "<td class=ccell><sup class=csup><b>%d</b></sup> ",
-			    d);
-			if (mn[d]) {
-				if (mp > 0) {
-					if (mn[d] > 0)
-						count = mn[d] - mp;
-					else
-						count = -mn[d];
-					if (count <= 0) {
-						buffer_free(&dst);
-						free(msgp);
-						return html_error(NULL);
-					}
-					buffer_appendf(&dst,
-					    "<a href=\"%02u/\">%u</a>",
-					    dp + 1, count);
-				}
-				mp = mn[d];
-				dp = d;
-			}
-			if (d == daysinmonth && 7 - col - 1 > 0)
-				buffer_appendf(&dst,
-				    "<td class=cspan colspan=\"%d\">",
-				    7 - col - 1);
-		}
-		buffer_appends(&dst, "\n</table>\n");
+		html_output_month_cal(&dst, mn, y, m);
 
 		total = 0;
 		dp = 0;
@@ -1406,7 +1412,7 @@ int html_year_index(char *list, unsigned int y)
 				if (!o_header) {
 					buffer_appends(&dst,
 					    "\n<table border=0 "
-					    "class=calendar><tr><th>"
+					    "class=cal_brief><tr><th>"
 					    "<th>Jan<th>Feb<th>Mar"
 					    "<th>Apr<th>May<th>Jun"
 					    "<th>Jul<th>Aug<th>Sep"
@@ -1419,8 +1425,7 @@ int html_year_index(char *list, unsigned int y)
 						for (o_month++; o_month <= 12;
 						    o_month++)
 							buffer_appends(&dst,
-							    "<td class=ccell>"
-							    "&nbsp;");
+							    "<td>&nbsp;");
 					buffer_appendf(&dst, "\n<tr><td>");
 					if (min_y != max_y)
 						buffer_appendf(&dst,
@@ -1432,10 +1437,8 @@ int html_year_index(char *list, unsigned int y)
 					o_month = 0;
 				}
 				for (o_month++; o_month < m; o_month++)
-					buffer_appends(&dst, "<td class=ccell>"
-					    "&nbsp;");
-				buffer_appendf(&dst, "<td class=ccell>"
-				    "<a href=\"");
+					buffer_appends(&dst, "<td>&nbsp;");
+				buffer_appendf(&dst, "<td><a href=\"");
 				if (min_y != max_y)
 					buffer_appendf(&dst, "%u/", y);
 				buffer_appendf(&dst, "%02u/\">%u</a>",
@@ -1448,8 +1451,7 @@ int html_year_index(char *list, unsigned int y)
 		if (o_header) {
 			if (o_year)
 				for (o_month++; o_month <= 12; o_month++)
-					buffer_appends(&dst, "<td class=ccell>"
-					    "&nbsp;");
+					buffer_appends(&dst, "<td>&nbsp;");
 			buffer_appends(&dst, "\n</table>\n");
 		}
 
@@ -1467,15 +1469,39 @@ int html_year_index(char *list, unsigned int y)
 			buffer_appends(&dst, "</ul>\n");
 		}
 
-		free(msg); msg = NULL;
-		free(mn); mn = NULL;
-
 		if (total)
 			buffer_appendf(&dst, "<p>%u message%s\n",
 			    total, total == 1 ? "" : "s");
 		else
 			buffer_appends(&dst, "<p>No messages\n");
-	}
+
+		/* output monthly calendars */
+		if (min_y == max_y) {
+			y = min_y;
+			buffer_appends(&dst,
+			    "\n<table border=0 class=cal_big>");
+			for (m = 1; m <= 12; m++) {
+				rday = YMD2ADAY(y - MIN_YEAR, m, 1) - aday;
+				if (m % 3 == 1) {
+					unsigned int n;
+
+					buffer_appends(&dst, "\n<tr>");
+					for (n = m; n < m + 3; n++)
+						buffer_appendf(&dst,
+						    "<th><a href=%02u>%s</a>",
+						    n, month_name[n - 1]);
+					buffer_appends(&dst, "\n<tr>");
+				}
+
+				buffer_appends(&dst, "<td valign=\"top\">");
+				html_output_month_cal(&dst, &mn[rday], y, m);
+			}
+			buffer_appends(&dst, "</table>");
+		}
+
+		free(mn); mn = NULL;
+		free(msg); msg = NULL;
+	} /* HTML_BODY */
 
 	free(msg);
 	free(mn);
