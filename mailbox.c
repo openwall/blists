@@ -721,6 +721,7 @@ int mailbox_parse(char *mailbox)
 				close(idx_fd);
 				unlock_fd(fd);
 				close(fd);
+				free(idx);
 				return 0;
 			}
 		}

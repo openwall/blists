@@ -46,8 +46,12 @@ int mime_init(struct mime_ctx *ctx, struct buffer *src)
 	/* src: input data (from ptr to end)
 	 * dst: decoded data (from start to ptr)
 	 * enc: small intermediate iconv buffer */
-	if (buffer_init(&ctx->dst, src->end - src->ptr)) return -1;
-	if (buffer_init(&ctx->enc, ICONV_BUF_SIZE)) return -1;
+	if (buffer_init(&ctx->dst, src->end - src->ptr))
+		return -1;
+	if (buffer_init(&ctx->enc, ICONV_BUF_SIZE)) {
+		buffer_free(&ctx->dst);
+		return -1;
+	}
 
 	if (new_entity(ctx)) {
 		buffer_free(&ctx->dst);
@@ -74,6 +78,7 @@ void mime_free(struct mime_ctx *ctx)
 {
 	free_entities_to(ctx, NULL);
 	buffer_free(&ctx->dst);
+	buffer_free(&ctx->enc);
 }
 
 /* advance src->ptr to consume single header (multi-line if need),
