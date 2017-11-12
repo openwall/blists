@@ -293,14 +293,15 @@ static int html_send(struct buffer *dst)
 
 static int is_attachment(struct mime_ctx *mime)
 {
-	if (mime->entities->filename ||
-	    !strcasecmp(mime->entities->type, "application/octet-stream"))
+	/* ignore application/octet-stream if they don't have name= */
+	if (mime->entities->filename)
 		return 1;
 	return 0;
 }
 
 static int is_inline(struct mime_ctx *mime)
 {
+	/* first condition makes this always !is_attachment */
 	if (!mime->entities->filename &&
 	    mime->entities->disposition != CONTENT_ATTACHMENT &&
 	    !strncasecmp(mime->entities->type, "text/", 5) &&
@@ -565,28 +566,42 @@ int html_message(char *list,
 			else {
 				if (is_attachment(&mime)) {
 					attachment_count++;
-					if (!is_inline(&mime)) {
-						int text = 0;
+					int text = 0;
 
-						if (!strncasecmp(mime.entities->type, "text/", 5))
-							text = 1;
-						buffer_appendf(&dst,
-						    "\n<span style=\"font-family: times;\"><strong>"
-						    "%s attachment:</strong> <a href=\"%u/%u\"%s>",
-						    text ? "View" : "Download",
-						    n, attachment_count,
-						    text ? "" :  " rel=\"nofollow\" download");
-						if (mime.entities->filename)
-							buffer_appends_html(&dst,
-							    mime.entities->filename);
-						buffer_appends(&dst,
-						    " (<i>");
+					if (!strncasecmp(mime.entities->type, "text/", 5))
+						text = 1;
+					buffer_appendf(&dst,
+					    "\n<span style=\"font-family: times;\"><strong>"
+					    "%s attachment:</strong> <a href=\"%u/%u\"%s>",
+					    text ? "View" : "Download",
+					    n, attachment_count,
+					    text ? "" :  " rel=\"nofollow\" download");
+					if (mime.entities->filename)
 						buffer_appends_html(&dst,
-						    mime.entities->type);
-						buffer_appends(&dst,
-						    "</i>)</a></span>\n");
-						body = NULL;
+						    mime.entities->filename);
+					buffer_appends(&dst,
+					    " (<i>");
+					buffer_appends_html(&dst,
+					    mime.entities->type);
+					buffer_appends(&dst,
+					    "</i>)</a></span>\n");
+					body = NULL;
+				} else if (!is_inline(&mime)) {
+					buffer_appendf(&dst,
+					    "\n<span style=\"font-family: times;\"><strong>"
+					    "Skipped mime section:</strong>");
+					if (mime.entities->filename) {
+						buffer_appendc(&dst, ' ');
+						buffer_appends_html(&dst,
+						    mime.entities->filename);
 					}
+					buffer_appends(&dst,
+					    " (<i>");
+					buffer_appends_html(&dst,
+					    mime.entities->type);
+					buffer_appends(&dst,
+					    "</i>)</span>\n");
+					body = NULL;
 				}
 			}
 			if (body) {
