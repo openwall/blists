@@ -26,6 +26,8 @@
 
 int html_flags = HTML_BODY;
 
+#define MAX_FILENAME_LEN	100
+
 /* Please don't remove this (although you may) */
 static char *footer =
 	"<p><a href=\"http://www.openwall.com/blists/\">Powered by blists</a>"
@@ -129,9 +131,17 @@ static char *detect_url(char *what, char *colon, char *end,
 static void buffer_append_filename(struct buffer *dst,
     const char *fn, int text)
 {
-	if (!fn || !*fn)
+	int i;
+
+	if (!fn)
 		fn = "attachment";
-	for (; *fn; ++fn) {
+	for (i = strlen(fn); i >= 0; --i)
+		if (fn[i] == '/' || fn[i] == '\\')
+			break;
+	fn += i + 1;
+	if (!*fn)
+		fn = "attachment";
+	for (i = 0; i < MAX_FILENAME_LEN && *fn; ++fn, ++i) {
 		if ((*fn >= '0' && *fn <= '9') ||
 		    (*fn >= 'a' && *fn <= 'z') ||
 		    (*fn >= 'A' && *fn <= 'Z'))
