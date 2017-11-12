@@ -1123,57 +1123,55 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 			return html_error("No messages for this month.");
 		}
 
-		buffer_appends(&dst,
+		/* "Monday is the first day of the week according to the
+		 * international standard ISO 8601" */
+		enum { SUNDAY, MONDAY } weekstart = MONDAY;
+		buffer_appendf(&dst,
 		    "\n<table border=0 class=calendb style=\"text-align: right;\"><tr>"
-		    "<th>Sun<th>Mon<th>Tue<th>Wed<th>Thu<th>Fri<th>Sat");
+		    "%s<th>Mon<th>Tue<th>Wed<th>Thu<th>Fri<th>Sat%s",
+		    weekstart == SUNDAY ? "<th>Sun" : "",
+		    weekstart == MONDAY ? "<th>Sun" : "");
 
 		int leapyear = y % 4 || (y % 100 == 0 && y % 400) ? 0 : 1;
 		int daysinmonth = m == 2 ? 28 + leapyear : 31 - (m - 1) % 7 % 2;
 		int firstday = dayofweek(y, m, 1);
-		int lastday  = dayofweek(y, m, daysinmonth);
 
 		dp = 0;
 		mp = mn[0];
-		for (n = 1; n <= daysinmonth + firstday; n++) {
-			int d = n - firstday;
+		for (d = 1; d <= daysinmonth; d++) {
+			unsigned int col = (7 + d + firstday - weekstart - 1) % 7;
 
-			if (n % 7 == 1)
+			if (d == 1 || col == 0)
 				buffer_appends(&dst, "\n<tr>");
-			if (n == 1 && d < 1 && firstday > 0)
+			if (d == 1 && col > 0)
 				buffer_appendf(&dst,
 				    "<td class=cspan colspan=\"%d\">",
-				    firstday);
-			if (d > 0) {
-				buffer_appendf(&dst,
-				    "<td class=ccell>"
-				    "<sup style=\"color: #F0F0F0; text-align: left; float: left;\">"
-				    "<b>%d</b></sup> ",
-				    d);
-				if (mn[d]) {
-					if (mp > 0) {
-						if (mn[d] > 0)
-							count = mn[d] - mp;
-						else
-							count = -mn[d];
-						if (count <= 0) {
-							buffer_free(&dst);
-							free(msgp);
-							return html_error(NULL);
-						}
-						buffer_appendf(&dst,
-						    "<a href=\"%02u/\">%u</a>",
-						    dp + 1, count);
+				    col);
+			buffer_appendf(&dst,
+			    "<td class=ccell><sup class=csup><b>%d</b></sup> ",
+			    d);
+			if (mn[d]) {
+				if (mp > 0) {
+					if (mn[d] > 0)
+						count = mn[d] - mp;
+					else
+						count = -mn[d];
+					if (count <= 0) {
+						buffer_free(&dst);
+						free(msgp);
+						return html_error(NULL);
 					}
-					mp = mn[d];
-					dp = d;
+					buffer_appendf(&dst,
+					    "<a href=\"%02u/\">%u</a>",
+					    dp + 1, count);
 				}
+				mp = mn[d];
+				dp = d;
 			}
-			if (d == daysinmonth) {
+			if (d == daysinmonth && 7 - col - 1 > 0)
 				buffer_appendf(&dst,
 				    "<td class=cspan colspan=\"%d\">",
-				    7 - lastday - 1);
-				break;
-			}
+				    7 - col - 1);
 		}
 		buffer_appends(&dst, "\n</table>\n");
 

@@ -45,6 +45,7 @@ SSI-enabled HTML file (usually with extension .shtml):
     <style type="text/css">
     .calendar { text-align: center; }
     .ccell { background: #ccc; width: 5ex; padding: 2px; }
+    .csup { color: #F0F0F0; text-align: left; float: left; }
     </style>
     </head>
     <body>
