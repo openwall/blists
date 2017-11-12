@@ -442,7 +442,7 @@ int html_message(char *list,
 	}
 	if (buffer_init(&dst, size)) {
 		buffer_free(&src);
-		free(list_file);
+		mime_free(&mime);
 		return html_error(NULL);
 	}
 
@@ -486,6 +486,12 @@ int html_message(char *list,
 			continue;
 		}
 		mime_skip_header(&mime);
+	}
+	if (src.ptr >= src.end) {
+		buffer_free(&src);
+		buffer_free(&dst);
+		mime_free(&mime);
+		return html_error(NULL);
 	}
 	if (*src.ptr == '\n') body = ++src.ptr;
 
@@ -755,7 +761,7 @@ int html_attachment(char *list,
 	}
 	if (buffer_init(&dst, size)) {
 		buffer_free(&src);
-		free(list_file);
+		mime_free(&mime);
 		return html_error(NULL);
 	}
 
@@ -768,6 +774,12 @@ int html_attachment(char *list,
 				continue;
 		}
 		mime_skip_header(&mime);
+	}
+	if (src.ptr >= src.end) {
+		buffer_free(&src);
+		buffer_free(&dst);
+		mime_free(&mime);
+		return html_error(NULL);
 	}
 	if (*src.ptr == '\n') body = ++src.ptr;
 
