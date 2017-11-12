@@ -309,7 +309,6 @@ static int html_send(struct buffer *dst)
 
 static int is_attachment(struct mime_ctx *mime)
 {
-	/* ignore application/octet-stream if they don't have name= */
 	if (mime->entities->filename)
 		return 1;
 	return 0;
