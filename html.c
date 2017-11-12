@@ -598,7 +598,7 @@ int html_message(char *list,
 			if (!body)
 				break;
 			if (bend >= src.end)
-				skip = 1;
+				skip = trunc;
 			bend = src.ptr;
 			if (!skip && isattachment) {
 				attachment_count++;
@@ -624,6 +624,8 @@ int html_message(char *list,
 				continue;
 			} else if (!isinline)
 				skip = 1;
+			else
+				skip = 0; /* do not skip non-attachments */
 			if (skip) {
 				buffer_appendf(&dst,
 				    "\n<span style=\"font-family: times;\"><strong>"
