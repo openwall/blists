@@ -126,6 +126,23 @@ static char *detect_url(char *what, char *colon, char *end,
 	return url;
 }
 
+static void buffer_append_filename(struct buffer *dst,
+    const char *fn, int text)
+{
+	if (!fn || !*fn)
+		fn = "attachment";
+	for (; *fn; ++fn) {
+		if ((*fn >= '0' && *fn <= 9) ||
+		    (*fn >= 'a' && *fn <= 'z') ||
+		    (*fn >= 'A' && *fn <= 'Z') ||
+		    *fn == '-')
+			buffer_appendc(dst, *fn);
+		else
+			buffer_appendc(dst, '_');
+	}
+	buffer_appends(dst, text ? ".txt" : ".bin");
+}
+
 /* Produces output of the same length as input, thus,
  * Content-Length calculation could rely on that assumption. */
 static void buffer_append_obfuscate(struct buffer *dst, char *what,
@@ -780,10 +797,11 @@ int html_attachment(char *list,
 					    "Content-Type: application/octet-stream\n");
 				buffer_appendf(&dst,
 				    "Content-Disposition: %s;"
-				    " filename=\"%s-%u%02u%02u-%u-%u.%s\"\n",
-				    text ? "inline" : "attachment",
-				    list, y, m, d, n, attachment_count,
-				    text ? "txt" : "bin");
+				    " filename=\"",
+				    text ? "inline" : "attachment");
+				buffer_append_filename(&dst,
+				    mime.entities->filename, text);
+				buffer_appends(&dst, "\"\n");
 			}
 		}
 		if (body) {
