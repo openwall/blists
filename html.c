@@ -690,9 +690,9 @@ int html_attachment(char *list,
 	offset = idx_msg.offset;
 	size = idx_msg.size;
 
-	trunc = size > MAX_WITH_ATTACHMENT_SIZE;
+	trunc = size > MAX_MESSAGE_SIZE;
 	if (trunc)
-		size = MAX_WITH_ATTACHMENT_SIZE;
+		size = MAX_MESSAGE_SIZE_TRUNC;
 	if (buffer_init(&src, size)) {
 		free(list_file);
 		return html_error(NULL);
