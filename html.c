@@ -579,68 +579,69 @@ int html_message(char *list,
 			}
 			if (mime.entities->boundary)
 				body = NULL;
-			else {
-				if (is_attachment(&mime)) {
-					attachment_count++;
-					int text = 0;
-
-					if (!strncasecmp(mime.entities->type, "text/", 5))
-						text = 1;
-					buffer_appendf(&dst,
-					    "\n<span style=\"font-family: times;\"><strong>"
-					    "%s attachment:</strong> <a href=\"%u/%u\"%s>",
-					    text ? "View" : "Download",
-					    n, attachment_count,
-					    text ? "" :  " rel=\"nofollow\" download");
-					if (mime.entities->filename)
-						buffer_appends_html(&dst,
-						    mime.entities->filename);
-					buffer_appends(&dst, " (<i>");
-					buffer_appends_html(&dst,
-					    mime.entities->type);
-					buffer_appends(&dst, "</i>)</a>");
-
-					body = mime_decode_body(&mime, RECODE_NO, NULL);
-					if (body)
-						buffer_appendf(&dst,
-						    " %llu bytes\n",
-						    (unsigned long long)(mime.dst.ptr - body));
-
-					buffer_appends(&dst, "</span>\n");
-					bend = src.ptr;
-					continue;
-				} else if (!is_inline(&mime)) {
-					buffer_appendf(&dst,
-					    "\n<span style=\"font-family: times;\"><strong>"
-					    "Skipped MIME section:</strong>");
-					if (mime.entities->filename) {
-						buffer_appendc(&dst, ' ');
-						buffer_appends_html(&dst,
-						    mime.entities->filename);
-					}
-					buffer_appends(&dst, " (<i>");
-					buffer_appends_html(&dst,
-					    mime.entities->type);
-					buffer_appends(&dst,
-					    "</i>)</span>\n");
-					body = NULL;
-				}
-			}
-			if (body) {
-				body = mime_decode_body(&mime, RECODE_YES, NULL);
-				if (!body)
-					break;
-				bend = src.ptr;
-			} else {
+			if (!body) {
 				bend = mime_skip_body(&mime);
 				if (!bend)
 					break;
 				continue;
 			}
 
+			/* mime_decode_body() will break mime vars, so,
+			 * remember them now */
+			char *filename = mime.entities->filename;
+			char *type = mime.entities->type;
+			const int isattachment = is_attachment(&mime);
+			const int isinline = is_inline(&mime);
+			int skip = 0;
+
+			body = mime_decode_body(&mime,
+			    isattachment ? RECODE_NO : RECODE_YES, &bend);
+			if (!body)
+				break;
+			if (bend >= src.end)
+				skip = 1;
+			bend = src.ptr;
+			if (!skip && isattachment) {
+				attachment_count++;
+				int text = 0;
+
+				if (!strncasecmp(type, "text/", 5))
+					text = 1;
+				buffer_appendf(&dst,
+				    "\n<span style=\"font-family: times;\"><strong>"
+				    "%s attachment:</strong> <a href=\"%u/%u\"%s>",
+				    text ? "View" : "Download",
+				    n, attachment_count,
+				    text ? "" :  " rel=\"nofollow\" download");
+				if (filename)
+					buffer_appends_html(&dst, filename);
+				buffer_appends(&dst, " (<i>");
+				buffer_appends_html(&dst, type);
+				buffer_appends(&dst, "</i>)</a>");
+				if (body)
+					buffer_appendf(&dst, " %llu bytes\n",
+					    (unsigned long long)(mime.dst.ptr - body));
+				buffer_appends(&dst, "</span>\n");
+				continue;
+			} else if (!isinline)
+				skip = 1;
+			if (skip) {
+				buffer_appendf(&dst,
+				    "\n<span style=\"font-family: times;\"><strong>"
+				    "Skipped MIME section:</strong>");
+				if (filename) {
+					buffer_appendc(&dst, ' ');
+					buffer_appends_html(&dst, filename);
+				}
+				buffer_appends(&dst, " (<i>");
+				buffer_appends_html(&dst, type);
+				buffer_appends(&dst, "</i>)</span>\n");
+				continue;
+			}
+			/* inline */
 			buffer_appendc(&dst, '\n');
-			buffer_append_html_generic(&dst,
-			    body, mime.dst.ptr - body, 0, 1);
+			buffer_append_html_generic(&dst, body,
+			    mime.dst.ptr - body, 0, 1);
 			mime.dst.ptr = body;
 		} while (bend < src.end && mime.entities);
 		buffer_appends(&dst, "</pre>\n");
