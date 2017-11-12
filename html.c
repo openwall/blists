@@ -132,10 +132,9 @@ static void buffer_append_filename(struct buffer *dst,
 	if (!fn || !*fn)
 		fn = "attachment";
 	for (; *fn; ++fn) {
-		if ((*fn >= '0' && *fn <= 9) ||
+		if ((*fn >= '0' && *fn <= '9') ||
 		    (*fn >= 'a' && *fn <= 'z') ||
-		    (*fn >= 'A' && *fn <= 'Z') ||
-		    *fn == '-')
+		    (*fn >= 'A' && *fn <= 'Z'))
 			buffer_appendc(dst, *fn);
 		else
 			buffer_appendc(dst, '_');
@@ -613,7 +612,7 @@ int html_message(char *list,
 				} else if (!is_inline(&mime)) {
 					buffer_appendf(&dst,
 					    "\n<span style=\"font-family: times;\"><strong>"
-					    "Skipped mime section:</strong>");
+					    "Skipped MIME section:</strong>");
 					if (mime.entities->filename) {
 						buffer_appendc(&dst, ' ');
 						buffer_appends_html(&dst,
@@ -786,7 +785,7 @@ int html_attachment(char *list,
 					buffer_appends(&dst,
 					    "Content-Type: text/plain");
 					if (mime.entities->charset &&
-					    whitelisted_charset(mime.entities->charset))
+					    encoding_whitelisted_charset(mime.entities->charset))
 						buffer_appendf(&dst,
 						    "; charset=%s",
 						    mime.entities->charset);
@@ -809,7 +808,7 @@ int html_attachment(char *list,
 			if (bend >= src.end) {
 				dst.ptr = dst.start;
 				buffer_appendf(&dst,
-				    "Status: 404 Not found\n\n"
+				    "Status: 404 Not Found\n\n"
 				    "Attachment is truncated.\n");
 				break;
 			}
@@ -865,7 +864,7 @@ static void output_strings(struct buffer *dst, struct idx_message *m,
 
 	if (subj_len) {
 		trunc = (m->flags & IDX_F_SUBJECT_TRUNC) ||
-			utf8_remove_trailing_partial_character(subj, &subj_len);
+			encoding_utf8_remove_trailing_partial_character(subj, &subj_len);
 		buffer_append_html(dst, subj, subj_len);
 		if (trunc)
 			buffer_appends(dst, "&hellip;");
@@ -875,7 +874,7 @@ static void output_strings(struct buffer *dst, struct idx_message *m,
 		buffer_appends(dst, "</a>");
 	buffer_appends(dst, " (");
 	trunc = (m->flags & IDX_F_FROM_TRUNC) ||
-		utf8_remove_trailing_partial_character(from, &from_len);
+		encoding_utf8_remove_trailing_partial_character(from, &from_len);
 	buffer_append_html(dst, from, from_len);
 	if (trunc)
 		buffer_appends(dst, "&hellip;");

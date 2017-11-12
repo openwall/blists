@@ -57,7 +57,7 @@ static int match_charset(const char *charset, const char *mask)
 	return !*charset;
 }
 
-int whitelisted_charset(const char *charset)
+int encoding_whitelisted_charset(const char *charset)
 {
 	const char **p;
 
@@ -95,7 +95,7 @@ void encoding_to_utf8(struct buffer *dst, struct buffer *enc, const char *charse
 		charset = UNKNOWN_CHARSET;
 
 	if (!strcasecmp(UTF8_CHARSET, charset) ||
-	    !whitelisted_charset(charset))
+	    !encoding_whitelisted_charset(charset))
 		buffer_append(dst, iptr, inlen);
 	else {
 		iconv_t cd = iconv_open(UTF8_CHARSET, charset);
@@ -130,7 +130,7 @@ void encoding_to_utf8(struct buffer *dst, struct buffer *enc, const char *charse
 /* remove partial utf8 character from string by reducing its len */
 /* return how many bytes are removed, *lenp is modified to reflect new
  * length */
-int utf8_remove_trailing_partial_character(char *ptr, int *lenp)
+int encoding_utf8_remove_trailing_partial_character(char *ptr, int *lenp)
 {
 	int len;
 
