@@ -54,6 +54,7 @@ SSI-enabled HTML file (usually with extension .shtml):
                 padding: 2px; white-space: nowrap; text-align: right; }
     .cal_mon td[colspan] { background: inherit; }
     .cal_mon sup { color: #F0F0F0; text-align: left; float: left; }
+    .cal_mon a { text-align: right; margin-left: -4em; float: right; }
     </style>
     </head>
     <body>

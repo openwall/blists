@@ -1014,10 +1014,11 @@ static int dayofweek(unsigned int y, unsigned int m, unsigned int d)
 	return (y + y/4 - y/100 + y/400 + t[m-1] + d) % 7;
 }
 
+typedef enum { L_MONTHLY, L_DAILY } level_t;
 static void html_output_month_cal(struct buffer *pdst, idx_msgnum_t *mn,
-    unsigned int y, unsigned int m)
+    unsigned int y, unsigned int m, level_t level)
 {
-	unsigned int d, dp;
+	unsigned int d;
 	idx_msgnum_t mp, count;
 
 	/* "Monday is the first day of the week according to the
@@ -1033,7 +1034,6 @@ static void html_output_month_cal(struct buffer *pdst, idx_msgnum_t *mn,
 	int daysinmonth = m == 2 ? 28 + leapyear : 31 - (m - 1) % 7 % 2;
 	int firstday = dayofweek(y, m, 1);
 
-	dp = 0;
 	mp = mn[0];
 	for (d = 1; d <= daysinmonth; d++) {
 		unsigned int col = (7 + d + firstday - weekstart - 1) % 7;
@@ -1055,12 +1055,13 @@ static void html_output_month_cal(struct buffer *pdst, idx_msgnum_t *mn,
 					count = -mn[d];
 				if (count <= 0)
 					return;
-				buffer_appendf(pdst,
-				    "<a href=\"%02u/\">%u</a>",
-				    dp + 1, count);
+				buffer_appends(pdst, "<a href=\"");
+				if (level <= L_MONTHLY)
+					buffer_appendf(pdst, "%02u/", m);
+				buffer_appendf(pdst, "%02u/\">%u</a>",
+				    d, count);
 			}
 			mp = mn[d];
-			dp = d;
 		}
 		if (d == daysinmonth && 7 - col - 1 > 0)
 			buffer_appendf(pdst,
@@ -1185,7 +1186,7 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 			return html_error("No messages for this month.");
 		}
 
-		html_output_month_cal(&dst, mn, y, m);
+		html_output_month_cal(&dst, mn, y, m, L_DAILY);
 
 		total = 0;
 		dp = 0;
@@ -1469,6 +1470,8 @@ int html_year_index(char *list, unsigned int y)
 			buffer_appends(&dst, "</ul>\n");
 		}
 
+		free(msg); msg = NULL;
+
 		if (total)
 			buffer_appendf(&dst, "<p>%u message%s\n",
 			    total, total == 1 ? "" : "s");
@@ -1488,19 +1491,17 @@ int html_year_index(char *list, unsigned int y)
 					buffer_appends(&dst, "\n<tr>");
 					for (n = m; n < m + 3; n++)
 						buffer_appendf(&dst,
-						    "<th><a href=%02u>%s</a>",
+						    "<th><a href=%02u/>%s</a>",
 						    n, month_name[n - 1]);
 					buffer_appends(&dst, "\n<tr>");
 				}
 
 				buffer_appends(&dst, "<td valign=\"top\">");
-				html_output_month_cal(&dst, &mn[rday], y, m);
+				html_output_month_cal(&dst, &mn[rday],
+				    y, m, L_MONTHLY);
 			}
 			buffer_appends(&dst, "</table>");
 		}
-
-		free(mn); mn = NULL;
-		free(msg); msg = NULL;
 	} /* HTML_BODY */
 
 	free(msg);
