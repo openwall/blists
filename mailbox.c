@@ -97,7 +97,7 @@ static int message_process(struct parsed_message *msg)
 {
 	struct idx_message *idx_msg;
 	char *p;
-	int left;
+	size_t left;
 
 	idx_msg = msgs_grow();
 	if (!idx_msg) return -1;
@@ -132,7 +132,7 @@ static int message_process(struct parsed_message *msg)
 	p = idx_msg->strings;
 	left = sizeof(idx_msg->strings);
 	if (msg->from) {
-		int n = strlen(msg->from) + 1;
+		size_t n = strlen(msg->from) + 1;
 		if (n > left) {
 			if (n - left > 1)
 				idx_msg->flags |= IDX_F_FROM_TRUNC;
@@ -146,12 +146,13 @@ static int message_process(struct parsed_message *msg)
 		left--;
 	}
 	if (msg->subject) {
-		int n = strlen(msg->subject) + 1;
+		size_t n = strlen(msg->subject) + 1;
 		if (n > left) {
 			if (left < IDX_SUBJECT_MINGUALEN) {
 				/* extend buffer at the cost of the "From" */
-				int m = IDX_SUBJECT_MINGUALEN;
-				if (m > n) m = n;
+				size_t m = IDX_SUBJECT_MINGUALEN;
+				if (m > n)
+					m = n;
 				p -= m - left;
 				*(p - 1) = 0;
 				left = m;
@@ -295,7 +296,7 @@ retry:
 #ifdef __GNUC__
 __inline__
 #endif
-static int eq(char *s1, int n1, char *s2, int n2)
+static int eq(const char *s1, size_t n1, const char *s2, size_t n2)
 {
 	if (n1 < n2) return 0;
 	if (!memcmp(s1, s2, n2)) return 1;
@@ -570,7 +571,7 @@ static int mailbox_parse_fd(int fd)
 		premime.ptr = premime.start;
 		while (premime.ptr < premime.end && *premime.ptr != '\n') {
 			char *p = premime.ptr;
-			int l = premime.end - p, m = 0;
+			size_t l = premime.end - p, m = 0;
 			switch (*p) {
 			case 'M':
 			case 'm':
