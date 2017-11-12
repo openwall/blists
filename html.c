@@ -758,7 +758,13 @@ int html_attachment(char *list,
 			else {
 				if (!strncasecmp(mime.entities->type, "text/", 5)) {
 					buffer_appends(&dst,
-					    "Content-Type: text/plain\n");
+					    "Content-Type: text/plain");
+					if (mime.entities->charset &&
+					    whitelisted_charset(mime.entities->charset))
+						buffer_appendf(&dst,
+						    "; charset=%s",
+						    mime.entities->charset);
+					buffer_appendc(&dst, '\n');
 					text = 1;
 				} else
 					buffer_appends(&dst,

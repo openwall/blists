@@ -57,7 +57,7 @@ static int match_charset(const char *charset, const char *mask)
 	return !*charset;
 }
 
-static int whitelisted_charset(const char *charset)
+int whitelisted_charset(const char *charset)
 {
 	const char **p;
 
