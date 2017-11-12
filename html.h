@@ -16,8 +16,8 @@
 #define HTML_CENSOR			4
 #define HTML_ATTACHMENT			8
 
-#define MAX_SHORT_MSG_LIST		10
-#define MAX_RECENT_MSG_LIST		10
+#define MAX_SHORT_MSG_LIST		100
+#define MAX_RECENT_MSG_LIST		100
 
 /* Header vs. body */
 extern int html_flags;
