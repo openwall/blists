@@ -131,15 +131,9 @@ static char *detect_url(char *what, char *colon, char *end,
 static void buffer_append_filename(struct buffer *dst,
     const char *fn, int text)
 {
-	int i;
+	size_t i;
 
-	if (!fn)
-		fn = "attachment";
-	for (i = strlen(fn); i >= 0; --i)
-		if (fn[i] == '/' || fn[i] == '\\')
-			break;
-	fn += i + 1;
-	if (!*fn)
+	if (!fn || !*fn)
 		fn = "attachment";
 	for (i = 0; i < MAX_FILENAME_LEN && *fn; ++fn, ++i) {
 		if ((*fn >= '0' && *fn <= '9') ||
