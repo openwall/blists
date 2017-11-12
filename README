@@ -9,7 +9,7 @@ supported).  bit is a CGI program, which generates web pages on the fly.
 
 To compile, simply run "make".  There's currently no "install" target;
 you're supposed to copy the bindex and bit programs in place on your
-own, as appropriate for your setup. Also you may need to setup for your
+own, as appropriate for your setup.  Also you may need to setup for your
 httpd: cgi, SSI (shtml), and mod_rewrite.
 
 You will likely want to have bindex run after new messages arrive.  For
@@ -26,8 +26,9 @@ example, you may invoke it from a .procmailrc file like this:
     }
 
 This delivers new messages to an mbox file called "listname" and it
-immediately triggers update of the index file for it.  Alternatively,
-you may choose to run bindex on cron.
+immediately triggers update of the index file for it.  You can also
+accomplish this from .forward and .qmail files.  Alternatively, you may
+choose to run bindex on cron.
 
 The index file name is produced by adding the .idx suffix to the mbox
 filename, so in this example it will be "listname.idx" in the same
@@ -82,12 +83,9 @@ this:
 
     RewriteEngine On
     RewriteRule ^((listname1|listname2)/([0-9]{4}/([0-9]{2}/([0-9]{2}/([1-9][0-9]*)?)?)?)?)$ list.shtml?$1 [L]
-
-For attachments to work also add:
-
     RewriteRule ^((listname1|listname2)/[0-9]{4}/[0-9]{2}/[0-9]{2}/[1-9][0-9]*/[0-9]+)$ /cgi-bin/bit?attachment+$1 [L]
 
-Direct call to bit is required to set HTTP headers.
+Direct call to bit is required to set HTTP headers for attachments.
 
 To workaround a bug in Lynx where it would omit the trailing slash when
 following links to "..", add:
