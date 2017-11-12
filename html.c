@@ -1014,9 +1014,9 @@ static int dayofweek(unsigned int y, unsigned int m, unsigned int d)
 	return (y + y/4 - y/100 + y/400 + t[m-1] + d) % 7;
 }
 
-typedef enum { L_MONTHLY, L_DAILY } level_t;
+typedef enum { L_MONTHLY, L_DAILY } html_date_level_t;
 static void html_output_month_cal(struct buffer *pdst, idx_msgnum_t *mn,
-    unsigned int y, unsigned int m, level_t level)
+    unsigned int y, unsigned int m, html_date_level_t level)
 {
 	unsigned int d;
 	idx_msgnum_t mp, count;
