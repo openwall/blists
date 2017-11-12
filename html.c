@@ -579,13 +579,20 @@ int html_message(char *list,
 					if (mime.entities->filename)
 						buffer_appends_html(&dst,
 						    mime.entities->filename);
-					buffer_appends(&dst,
-					    " (<i>");
+					buffer_appends(&dst, " (<i>");
 					buffer_appends_html(&dst,
 					    mime.entities->type);
-					buffer_appends(&dst,
-					    "</i>)</a></span>\n");
-					body = NULL;
+					buffer_appends(&dst, "</i>)</a>");
+
+					body = mime_decode_body(&mime, RECODE_NO, NULL);
+					if (body)
+						buffer_appendf(&dst,
+						    " %llu bytes\n",
+						    (unsigned long long)(mime.dst.ptr - body));
+
+					buffer_appends(&dst, "</span>\n");
+					bend = src.ptr;
+					continue;
 				} else if (!is_inline(&mime)) {
 					buffer_appendf(&dst,
 					    "\n<span style=\"font-family: times;\"><strong>"
@@ -595,8 +602,7 @@ int html_message(char *list,
 						buffer_appends_html(&dst,
 						    mime.entities->filename);
 					}
-					buffer_appends(&dst,
-					    " (<i>");
+					buffer_appends(&dst, " (<i>");
 					buffer_appends_html(&dst,
 					    mime.entities->type);
 					buffer_appends(&dst,
@@ -606,13 +612,16 @@ int html_message(char *list,
 			}
 			if (body) {
 				body = mime_decode_body(&mime, RECODE_YES, NULL);
-				if (!body) break;
+				if (!body)
+					break;
 				bend = src.ptr;
 			} else {
 				bend = mime_skip_body(&mime);
-				if (!bend) break;
+				if (!bend)
+					break;
 				continue;
 			}
+
 			buffer_appendc(&dst, '\n');
 			buffer_append_html_generic(&dst,
 			    body, mime.dst.ptr - body, 0, 1);
