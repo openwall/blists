@@ -313,7 +313,7 @@ static int html_send(struct buffer *dst)
 
 static int is_attachment(struct mime_ctx *mime)
 {
-	if (mime->entities->filename)
+	if (mime->entities->filename && mime->entities->filename[0])
 		return 1;
 	return 0;
 }
@@ -618,35 +618,31 @@ int html_message(char *list,
 					text = 1;
 				buffer_appendf(&dst,
 				    "\n<span style=\"font-family: times;\"><strong>"
-				    "%s attachment:</strong> <a href=\"%u/%u\"%s>",
+				    "%s attachment \"</strong><a href=\"%u/%u\"%s>",
 				    text ? "View" : "Download",
 				    n, attachment_count,
 				    text ? "" :  " rel=\"nofollow\" download");
 				if (filename)
 					buffer_appends_html(&dst, filename);
-				buffer_appends(&dst, " (<i>");
+				buffer_appends(&dst, "</a><strong>\" of type \"</strong>");
 				buffer_appends_html(&dst, type);
-				buffer_appends(&dst, "</i>)</a>");
+				buffer_appends(&dst, "<strong>\"");
 				if (body)
-					buffer_appendf(&dst, " %llu bytes\n",
+					buffer_appendf(&dst, " (%llu bytes)",
 					    (unsigned long long)(mime.dst.ptr - body));
-				buffer_appends(&dst, "</span>\n");
+				buffer_appends(&dst, "</strong></span>\n");
 				continue;
-			} else if (!isinline)
+			} else if (!isinline) {
 				skip = 1;
-			else
+			} else {
 				skip = 0; /* do not skip non-attachments */
+			}
 			if (skip) {
-				buffer_appendf(&dst,
+				buffer_appends(&dst,
 				    "\n<span style=\"font-family: times;\"><strong>"
-				    "Skipped MIME section:</strong>");
-				if (filename) {
-					buffer_appendc(&dst, ' ');
-					buffer_appends_html(&dst, filename);
-				}
-				buffer_appends(&dst, " (<i>");
+				    "Content of type \"</strong>");
 				buffer_appends_html(&dst, type);
-				buffer_appends(&dst, "</i>)</span>\n");
+				buffer_appends(&dst, "<strong>\" skipped</strong></span>\n");
 				continue;
 			}
 			/* inline */
@@ -655,13 +651,14 @@ int html_message(char *list,
 			    mime.dst.ptr - body, 0, 1);
 			mime.dst.ptr = body;
 		} while (bend < src.end && mime.entities);
-		buffer_appends(&dst, "</pre>\n");
 
-		if (html_flags & HTML_CENSOR)
-			buffer_appends(&dst, "[ REMOVED ]\n");
-		else
-		if (trunc)
-			buffer_appends(&dst, "[ TRUNCATED ]\n");
+		if ((html_flags & HTML_CENSOR) || trunc)
+			buffer_appendf(&dst,
+			    "\n<span style=\"font-family: times;\"><strong>"
+			    "Content %s</strong></span>\n",
+			    (html_flags & HTML_CENSOR) ? "removed" : "truncated");
+
+		buffer_appends(&dst, "</pre>\n");
 	}
 
 	buffer_free(&src);
