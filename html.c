@@ -1053,12 +1053,8 @@ static void html_output_month_cal(struct buffer *pdst, idx_msgnum_t *mn,
 		if (d == 1 || col == 0)
 			buffer_appends(pdst, "\n<tr>");
 		if (d == 1 && col > 0)
-			buffer_appendf(pdst,
-			    "<td colspan=\"%d\">",
-			    col);
-		buffer_appendf(pdst,
-		    "<td><sup><b>%d</b></sup> ",
-		    d);
+			buffer_appendf(pdst, "<td colspan=\"%d\">", col);
+		buffer_appendf(pdst, "<td><sup><b>%d</b></sup> ", d);
 		if (mn[d]) {
 			if (mp > 0) {
 				if (mn[d] > 0)
@@ -1076,8 +1072,7 @@ static void html_output_month_cal(struct buffer *pdst, idx_msgnum_t *mn,
 			mp = mn[d];
 		}
 		if (d == daysinmonth && 7 - col - 1 > 0)
-			buffer_appendf(pdst,
-			    "<td colspan=\"%d\">",
+			buffer_appendf(pdst, "<td colspan=\"%d\">",
 			    7 - col - 1);
 	}
 	buffer_appends(pdst, "\n</table>\n");
