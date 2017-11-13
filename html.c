@@ -1498,7 +1498,7 @@ int html_year_index(char *list, unsigned int y)
 					buffer_appends(&dst, "\n<tr>");
 					for (n = m; n < m + 3; n++)
 						buffer_appendf(&dst,
-						    "<th><a href=%02u/>%s</a>",
+						    "<th><a href=\"%02u/\">%s</a>",
 						    n, month_name[n - 1]);
 					buffer_appends(&dst, "\n<tr>");
 				}
