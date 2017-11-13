@@ -1479,17 +1479,11 @@ int html_year_index(char *list, unsigned int y)
 
 		free(msg); msg = NULL;
 
-		if (total)
-			buffer_appendf(&dst, "<p>%u message%s\n",
-			    total, total == 1 ? "" : "s");
-		else
-			buffer_appends(&dst, "<p>No messages\n");
-
 		/* output monthly calendars */
 		if (min_y == max_y) {
 			y = min_y;
 			buffer_appends(&dst,
-			    "\n<table border=0 class=cal_big>");
+			    "\n<p>\n<table border=0 class=cal_big>");
 			for (m = 1; m <= 12; m++) {
 				rday = YMD2ADAY(y - MIN_YEAR, m, 1) - aday;
 				if (m % 3 == 1) {
@@ -1509,6 +1503,12 @@ int html_year_index(char *list, unsigned int y)
 			}
 			buffer_appends(&dst, "</table>");
 		}
+
+		if (total)
+			buffer_appendf(&dst, "<p>%u message%s\n",
+			    total, total == 1 ? "" : "s");
+		else
+			buffer_appends(&dst, "<p>No messages\n");
 	} /* HTML_BODY */
 
 	free(msg);
