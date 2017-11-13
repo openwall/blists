@@ -422,7 +422,7 @@ int html_message(char *list,
 
 	trunc = size > MAX_MESSAGE_SIZE;
 	if (trunc)
-		size = MAX_MESSAGE_SIZE_TRUNC;
+		size = MAX_MESSAGE_SIZE;
 	if (buffer_init(&src, size)) {
 		free(list_file);
 		return html_error(NULL);
@@ -741,7 +741,7 @@ int html_attachment(char *list,
 
 	trunc = size > MAX_MESSAGE_SIZE;
 	if (trunc)
-		size = MAX_MESSAGE_SIZE_TRUNC;
+		size = MAX_MESSAGE_SIZE;
 	if (buffer_init(&src, size)) {
 		free(list_file);
 		return html_error(NULL);
