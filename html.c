@@ -29,11 +29,11 @@ int html_flags = HTML_BODY;
 #define MAX_FILENAME_LEN	100
 
 /* Please don't remove this (although you may) */
-static char *footer =
+static const char * const footer =
 	"<p><a href=\"http://www.openwall.com/blists/\">Powered by blists</a>"
 	" - <a href=\"http://lists.openwall.net\">more mailing lists</a>\n";
 
-static char *month_name[] = {
+static const char * const month_name[] = {
 	"January", "February", "March", "April", "May", "June",
 	"July", "August", "September", "October", "November", "December"
 };
@@ -1020,7 +1020,7 @@ int html_day_index(char *list, unsigned int y, unsigned int m, unsigned int d)
 /* Tomohiko Sakamoto algorithm */
 static int dayofweek(unsigned int y, unsigned int m, unsigned int d)
 {
-	static int t[] = {0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4};
+	static const int t[] = {0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4};
 
 	y -= m < 3;
 	return (y + y/4 - y/100 + y/400 + t[m-1] + d) % 7;
