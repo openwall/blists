@@ -400,11 +400,13 @@ static int decode_header(struct mime_ctx *ctx, const char *header, size_t length
 		done = ++q;
 		if (*encoding == 'Q' || *encoding == 'q') {
 			decode_qp(&ctx->enc, encoding + 2, q - encoding - 4, 1);
-			if (encoding_to_utf8(dst, &ctx->enc, charset))
+			if (ctx->enc.error ||
+			    encoding_to_utf8(dst, &ctx->enc, charset))
 				return -1;
 		} else if (*encoding == 'B' || *encoding == 'b') {
 			decode_base64(&ctx->enc, encoding + 2, q - encoding - 4);
-			if (encoding_to_utf8(dst, &ctx->enc, charset))
+			if (ctx->enc.error ||
+			    encoding_to_utf8(dst, &ctx->enc, charset))
 				return -1;
 		}
 		p = done;
@@ -573,7 +575,7 @@ char *mime_decode_body(struct mime_ctx *ctx, mime_recode_t recode, char **bendp)
 	else
 		buffer_append(dst, body, length);
 	if (recode == RECODE_YES &&
-	    encoding_to_utf8(&ctx->dst, &ctx->enc, charset))
+	    (dst->error || encoding_to_utf8(&ctx->dst, dst, charset)))
 		return NULL;
 	if (ctx->dst.error)
 		return NULL;
