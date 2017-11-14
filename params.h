@@ -36,6 +36,16 @@
 #define MAX_URL_LENGTH			1024
 
 /*
+ * Maximum number of messages per day on month index pages.
+ */
+#define MAX_SHORT_MSG_LIST		100
+
+/*
+ * Maximum number of recent messages on the mailing list's main page.
+ */
+#define MAX_RECENT_MSG_LIST		100
+
+/*
  * Introduce some sane limits on the mailbox size in order to prevent
  * a single huge mailbox from stopping the entire service.
  * Well, that was the original intent; these got insane for blists, which
