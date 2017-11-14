@@ -350,7 +350,7 @@ static inline int islinearwhitespace(char ch)
 
 /* decode mime-encoded-words, ex: =?charset?encoding?encoded_text?= */
 /* from header to ctx->dst */
-static void decode_header(struct mime_ctx *ctx, const char *header, size_t length)
+static int decode_header(struct mime_ctx *ctx, const char *header, size_t length)
 {
 	const char *done, *p, *q, *end, *encoding, *charset;
 	struct buffer *dst = &ctx->dst;
@@ -400,15 +400,18 @@ static void decode_header(struct mime_ctx *ctx, const char *header, size_t lengt
 		done = ++q;
 		if (*encoding == 'Q' || *encoding == 'q') {
 			decode_qp(&ctx->enc, encoding + 2, q - encoding - 4, 1);
-			encoding_to_utf8(dst, &ctx->enc, charset);
+			if (encoding_to_utf8(dst, &ctx->enc, charset))
+				return -1;
 		} else if (*encoding == 'B' || *encoding == 'b') {
 			decode_base64(&ctx->enc, encoding + 2, q - encoding - 4);
-			encoding_to_utf8(dst, &ctx->enc, charset);
+			if (encoding_to_utf8(dst, &ctx->enc, charset))
+				return -1;
 		}
 		p = done;
 	}
 
 	buffer_append(dst, done, end - done);
+	return dst->error;
 }
 
 /* get(src), decode, and parse one header field (can be multi-line), put(dst) */
@@ -430,7 +433,8 @@ char *mime_decode_header(struct mime_ctx *ctx)
 
 	dst_offset = ctx->dst.ptr - ctx->dst.start;
 
-	decode_header(ctx, header, length);
+	if (decode_header(ctx, header, length))
+		return NULL;
 	buffer_append(&ctx->dst, "", 1);
 	if (ctx->dst.error)
 		return NULL;
@@ -568,8 +572,9 @@ char *mime_decode_body(struct mime_ctx *ctx, mime_recode_t recode, char **bendp)
 		decode_base64(dst, body, length);
 	else
 		buffer_append(dst, body, length);
-	if (recode == RECODE_YES)
-		encoding_to_utf8(&ctx->dst, &ctx->enc, charset);
+	if (recode == RECODE_YES &&
+	    encoding_to_utf8(&ctx->dst, &ctx->enc, charset))
+		return NULL;
 	if (ctx->dst.error)
 		return NULL;
 

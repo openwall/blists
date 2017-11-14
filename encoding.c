@@ -11,7 +11,6 @@
 
 #include <string.h>
 #include <stdlib.h>
-#include <assert.h>
 #include <iconv.h>
 #include <errno.h>
 
@@ -73,7 +72,7 @@ int encoding_whitelisted_charset(const char *charset)
 }
 
 /* convert text from `enc' buffer to `dst' by `charset' */
-void encoding_to_utf8(struct buffer *dst, struct buffer *enc, const char *charset)
+int encoding_to_utf8(struct buffer *dst, struct buffer *enc, const char *charset)
 {
 	char *iptr = enc->start;
 	size_t inlen = enc->ptr - enc->start;
@@ -109,7 +108,8 @@ void encoding_to_utf8(struct buffer *dst, struct buffer *enc, const char *charse
 
 		if (cd == (iconv_t)(-1))
 			cd = iconv_open(UTF8_CHARSET, UNKNOWN_CHARSET);
-		assert(cd != (iconv_t)(-1));
+		if (cd == (iconv_t)(-1))
+			return -1;
 		do {
 			char *optr = out;
 			size_t outlen = sizeof(out);
@@ -131,6 +131,7 @@ void encoding_to_utf8(struct buffer *dst, struct buffer *enc, const char *charse
 	}
 
 	enc->ptr = enc->start;
+	return dst->error;
 }
 
 /* remove partial utf8 character from string by reducing its len */

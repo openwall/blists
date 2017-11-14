@@ -17,7 +17,7 @@
 #define ENC_ICONV_BUF_SIZE		1024
 
 extern int encoding_whitelisted_charset(const char *charset);
-extern void encoding_to_utf8(struct buffer *dst, struct buffer *enc, const char *charset);
+extern int encoding_to_utf8(struct buffer *dst, struct buffer *enc, const char *charset);
 extern int encoding_utf8_remove_trailing_partial_character(char *ptr, int *lenp);
 
 #endif
