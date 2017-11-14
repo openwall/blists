@@ -20,9 +20,17 @@
 extern int html_flags;
 
 /*
- * Outputs an HTML error message to stdout.  If msg is NULL, then the
- * error is assumed to be internal to the server and a fixed message is
- * output.
+ * Outputs an error message intended for the end user to stdout.  If msg is
+ * NULL, then the error is assumed to be internal to the server and a fixed
+ * message is output.
+ *
+ * If we're invoked via SSI (as indicated by the SERVER_PROTOCOL environment
+ * variable), the message is output as a portion of the HTML page (header or
+ * body as indicated by html_flags).  Otherwise, the message is output as a
+ * full text/plain page along with the appropriate HTTP headers.
+ *
+ * Also, outputs the message along with source file name and line number to
+ * stderr, to be logged by the web server.
  */
 extern int html_error_real(const char *file, unsigned int lineno, const char *msg);
 #define html_error(x) html_error_real(__FILE__, __LINE__, x)

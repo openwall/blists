@@ -233,15 +233,19 @@ int html_error_real(const char *file, unsigned int lineno, const char *msg)
 {
 	char loc[128];
 	char *msgt;
+	const char *prefix = "The request has failed: ";
 
 	if (!msg)
 		msg = "Internal server error";
 
-	if (html_flags & HTML_HEADER)
-		msgt = concat("\n<title>The request has failed: ", msg, "</title>\n"
+	const char *p = getenv("SERVER_PROTOCOL");
+	if (!p || strcmp(p, "INCLUDED"))
+		msgt = concat("Status: 404 Not Found\nContent-Type: text/plain\n\n", prefix, msg, "\n", NULL);
+	else if (html_flags & HTML_HEADER)
+		msgt = concat("\n<title>", prefix, msg, "</title>\n"
 		    "<meta name=\"robots\" content=\"noindex\">\n", NULL);
 	else
-		msgt = concat("\n<p>The request has failed: ", msg, ".\n", footer, NULL);
+		msgt = concat("\n<p>", prefix, msg, "\n", footer, NULL);
 
 	write_loop(STDOUT_FILENO, msgt, strlen(msgt));
 	free(msgt);
