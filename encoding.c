@@ -31,7 +31,7 @@ static const char *charset_whitelist[] = {
 	"koi8-u$",
 	"windows-",
 	"cp",
-	"utf-8",
+	"utf-8", /* expected to be redundant with check for UTF8_CHARSET */
 	NULL
 };
 
@@ -96,13 +96,14 @@ void encoding_to_utf8(struct buffer *dst, struct buffer *enc, const char *charse
 	if (!*p || *p == '?') {
 		charset_buf[i] = '\0';
 		charset = charset_buf;
-	} else
+	} else {
 		charset = UNKNOWN_CHARSET;
+	}
 
 	if (!strcasecmp(UTF8_CHARSET, charset) ||
-	    !encoding_whitelisted_charset(charset))
+	    !encoding_whitelisted_charset(charset)) {
 		buffer_append(dst, iptr, inlen);
-	else {
+	} else {
 		iconv_t cd = iconv_open(UTF8_CHARSET, charset);
 		char out[ENC_ICONV_BUF_SIZE];
 
