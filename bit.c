@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2006,2008 Solar Designer <solar at openwall.com>
- * Copyright (c) 2011 ABC <abc at openwall.com>
+ * Copyright (c) 2006,2008,2017 Solar Designer <solar at openwall.com>
+ * Copyright (c) 2011,2017 ABC <abc at openwall.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted.
@@ -51,11 +51,14 @@ int main(int argc, char **argv)
 		return html_error(NULL);
 
 	for (p = list; *p; p++) {
-		if (p - list > 99) goto bad_syntax;
-		if (*p >= 'a' && *p <= 'z') continue;
-		if (*p >= '0' && *p <= '9') continue;
-		if (p != list && *p == '-') continue;
-		if (*p == '/') break;
+		if (p - list > 99)
+			goto bad_syntax;
+		if ((*p >= 'a' && *p <= 'z') ||
+		    (*p >= '0' && *p <= '9') ||
+		    (p != list && *p == '-'))
+			continue;
+		if (*p == '/')
+			break;
 		goto bad_syntax;
 	}
 	*p++ = '\0';
@@ -67,16 +70,13 @@ int main(int argc, char **argv)
 	if (sscanf(p, "%u/%u/%u/%u%c", &y, &m, &d, &n, &nul) >= 4 && !nul)
 		return html_message(list, y, m, d, n);
 
-	if (sscanf(p, "%u/%u/%u%c%c", &y, &m, &d, &slash, &nul) >= 4 &&
-	    slash == '/' && !nul)
+	if (sscanf(p, "%u/%u/%u%c%c", &y, &m, &d, &slash, &nul) >= 4 && slash == '/' && !nul)
 		return html_day_index(list, y, m, d);
 
-	if (sscanf(p, "%u/%u%c%c", &y, &m, &slash, &nul) >= 3 &&
-	    slash == '/' && !nul)
+	if (sscanf(p, "%u/%u%c%c", &y, &m, &slash, &nul) >= 3 && slash == '/' && !nul)
 		return html_month_index(list, y, m);
 
-	if (sscanf(p, "%u%c%c", &y, &slash, &nul) >= 2 && y &&
-	    slash == '/' && !nul)
+	if (sscanf(p, "%u%c%c", &y, &slash, &nul) >= 2 && y && slash == '/' && !nul)
 		return html_year_index(list, y);
 
 	if (!p[0])
