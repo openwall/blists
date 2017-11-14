@@ -113,7 +113,7 @@ int encoding_to_utf8(struct buffer *dst, struct buffer *enc, const char *charset
 		do {
 			char *optr = out;
 			size_t outlen = sizeof(out);
-			int e = iconv(cd, &iptr, &inlen, &optr, &outlen);
+			size_t e = iconv(cd, &iptr, &inlen, &optr, &outlen);
 			buffer_append(dst, out, optr - out);
 			/* if output buffer is full (errno == E2BIG) we
 			 * will just continue processing (it will be
@@ -121,12 +121,12 @@ int encoding_to_utf8(struct buffer *dst, struct buffer *enc, const char *charset
 			 * also updates iptr and inlen), otherwise
 			 * report conversion error with REPLACEMENT
 			 * CHARACTER (U+FFFD), which looks like <?>. */
-			if (e == -1 && errno != E2BIG) {
+			if (e == (size_t)-1 && errno != E2BIG) {
 				buffer_appenduc(dst, 0xFFFD);
 				iptr++;
 				inlen--;
 			}
-		} while ((int)inlen > 0);
+		} while ((ssize_t)inlen > 0);
 		iconv_close(cd);
 	}
 
