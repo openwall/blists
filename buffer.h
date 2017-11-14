@@ -1,12 +1,14 @@
 /*
  * Generic dynamically-allocated auto-growing in-memory buffers.
  *
- * Written by Solar Designer <solar at openwall.com> in 2006.
+ * Written by Solar Designer <solar at openwall.com> in 2006,
+ * revised by ABC <abc at openwall.com> in 2014 (buffer_appenduc() function).
  * No copyright is claimed, and the software is hereby placed in the public
  * domain.  In case this attempt to disclaim copyright and place the software
  * in the public domain is deemed null and void, then the software is
- * Copyright (c) 2006 Solar Designer and it is hereby released to the
- * general public under the following terms:
+ * Copyright (c) 2006 Solar Designer <solar at openwall.com>
+ * Copyright (c) 2014 ABC <abc at openwall.com>
+ * and it is hereby released to the general public under the following terms:
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted.
