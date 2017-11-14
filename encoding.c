@@ -1,7 +1,7 @@
 /*
  * Charset encoding processing.
  *
- * Copyright (c) 2011,2014 ABC <abc at openwall.com>
+ * Copyright (c) 2011,2014,2017 ABC <abc at openwall.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted.
