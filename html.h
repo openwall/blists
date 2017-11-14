@@ -30,7 +30,7 @@ extern int html_error_real(const char *file, unsigned int lineno, const char *ms
 /*
  * Loads the specified attachment and outputs it to stdout verbatim.
  */
-extern int html_attachment(char *list,
+extern int html_attachment(const char *list,
 	unsigned int y, unsigned int m, unsigned int d, unsigned int n,
 	unsigned int a);
 
@@ -38,24 +38,24 @@ extern int html_attachment(char *list,
  * Loads the specified message and outputs it to stdout with conversion
  * to HTML and hyperlinks added.
  */
-extern int html_message(char *list,
+extern int html_message(const char *list,
 	unsigned int y, unsigned int m, unsigned int d, unsigned int n);
 
 /*
  * Outputs the message index for the specified day to stdout.
  */
-extern int html_day_index(char *list, unsigned int y, unsigned int m,
+extern int html_day_index(const char *list, unsigned int y, unsigned int m,
 	unsigned int d);
 
 /*
  * Outputs the message index for the specified month to stdout.
  */
-extern int html_month_index(char *list, unsigned int y, unsigned int m);
+extern int html_month_index(const char *list, unsigned int y, unsigned int m);
 
 /*
  * Outputs the summary with hyperlinks for the specified year to stdout.
  * If the year is specified as 0, the summary for all years is output.
  */
-extern int html_year_index(char *list, unsigned int y);
+extern int html_year_index(const char *list, unsigned int y);
 
 #endif

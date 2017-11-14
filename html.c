@@ -39,7 +39,7 @@ static const char * const month_name[] = {
 /*
  * Checks if the hostname ending just before end belongs to domain.
  */
-static int match_domain(char *hostname, char *end, char *domain)
+static int match_domain(const char *hostname, const char *end, const char *domain)
 {
 	size_t hostname_length = end - hostname;
 	size_t domain_length = strlen(domain);
@@ -49,10 +49,10 @@ static int match_domain(char *hostname, char *end, char *domain)
 	    *(end - domain_length - 1) == '.';
 }
 
-static char *detect_url(char *what, char *colon, char *end,
+static const char *detect_url(const char *what, const char *colon, const char *end,
 	size_t *url_length, int *safe)
 {
-	char *ptr, *url, *hostname;
+	const char *ptr, *url, *hostname;
 
 	if (colon - what >= 5 && !memcmp((ptr = colon - 5), "https", 5))
 		url = ptr;
@@ -175,10 +175,10 @@ static void buffer_append_obfuscate(struct buffer *dst, char *what,
 	}
 }
 
-static void buffer_append_html_generic(struct buffer *dst, char *what,
+static void buffer_append_html_generic(struct buffer *dst, const char *what,
 	size_t length, int quotes, int detect_urls)
 {
-	char *ptr, *end, *url;
+	const char *ptr, *end, *url;
 	size_t url_length;
 	int url_safe;
 	unsigned char c;
@@ -250,17 +250,17 @@ static void buffer_append_html_generic(struct buffer *dst, char *what,
 	}
 }
 
-static void buffer_append_html(struct buffer *dst, char *what, size_t length)
+static void buffer_append_html(struct buffer *dst, const char *what, size_t length)
 {
 	buffer_append_html_generic(dst, what, length, 0, 0);
 }
 
-static void buffer_appends_html(struct buffer *dst, char *what)
+static void buffer_appends_html(struct buffer *dst, const char *what)
 {
 	buffer_append_html(dst, what, strlen(what));
 }
 
-static void buffer_append_header(struct buffer *dst, char *what)
+static void buffer_append_header(struct buffer *dst, const char *what)
 {
 	buffer_appends_html(dst, what);
 	buffer_appendc(dst, '\n');
@@ -327,7 +327,7 @@ static int is_inline(struct mime_ctx *mime)
 	return 0; /* do not show */
 }
 
-int html_message(char *list,
+int html_message(const char *list,
 	unsigned int y, unsigned int m, unsigned int d, unsigned int n)
 {
 	unsigned int aday, n0, n2;
@@ -672,7 +672,7 @@ int html_message(char *list,
 	return html_send(&dst);
 }
 
-int html_attachment(char *list,
+int html_attachment(const char *list,
 	unsigned int y, unsigned int m, unsigned int d, unsigned int n,
 	unsigned int a)
 {
@@ -894,7 +894,7 @@ static void output_strings(struct buffer *dst, struct idx_message *m,
 	buffer_appends(dst, ")");
 }
 
-int html_day_index(char *list, unsigned int y, unsigned int m, unsigned int d)
+int html_day_index(const char *list, unsigned int y, unsigned int m, unsigned int d)
 {
 	unsigned int aday;
 	off_t idx_offset;
@@ -1073,7 +1073,7 @@ static void html_output_month_cal(struct buffer *pdst, idx_msgnum_t *mn,
 	buffer_appends(pdst, "\n</table>\n");
 }
 
-int html_month_index(char *list, unsigned int y, unsigned int m)
+int html_month_index(const char *list, unsigned int y, unsigned int m)
 {
 	unsigned int d, n, aday, dp;
 	int fd;
@@ -1253,7 +1253,7 @@ int html_month_index(char *list, unsigned int y, unsigned int m)
 	return html_send(&dst);
 }
 
-int html_year_index(char *list, unsigned int y)
+int html_year_index(const char *list, unsigned int y)
 {
 	unsigned int min_y, max_y, m, d, aday, rday;
 	int fd;
