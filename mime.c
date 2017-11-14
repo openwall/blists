@@ -48,7 +48,7 @@ int mime_init(struct mime_ctx *ctx, struct buffer *src)
 	 * enc: small intermediate iconv buffer */
 	if (buffer_init(&ctx->dst, src->end - src->ptr))
 		return -1;
-	if (buffer_init(&ctx->enc, ICONV_BUF_SIZE)) {
+	if (buffer_init(&ctx->enc, ENC_ICONV_BUF_SIZE)) {
 		buffer_free(&ctx->dst);
 		return -1;
 	}

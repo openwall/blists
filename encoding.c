@@ -18,6 +18,11 @@
 #include "buffer.h"
 #include "encoding.h"
 
+#define UTF8_CHARSET			"UTF-8"
+#define DEFAULT_CHARSET			"latin1"
+#define UNKNOWN_CHARSET			"latin1"
+#define MAX_CHARSET_LEN			70
+
 static const char *charset_whitelist[] = {
 	"us-ascii$",
 	"iso",
@@ -99,7 +104,7 @@ void encoding_to_utf8(struct buffer *dst, struct buffer *enc, const char *charse
 		buffer_append(dst, iptr, inlen);
 	else {
 		iconv_t cd = iconv_open(UTF8_CHARSET, charset);
-		char out[ICONV_BUF_SIZE];
+		char out[ENC_ICONV_BUF_SIZE];
 
 		if (cd == (iconv_t)(-1))
 			cd = iconv_open(UTF8_CHARSET, UNKNOWN_CHARSET);
