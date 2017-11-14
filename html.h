@@ -28,15 +28,15 @@ extern int html_error_real(const char *file, unsigned int lineno, const char *ms
 #define html_error(x) html_error_real(__FILE__, __LINE__, x)
 
 /*
- * Loads the specified attachment and outputs it to stdout verbatim.
- */
-extern int html_attachment(const char *list, unsigned int y, unsigned int m, unsigned int d, unsigned int n, unsigned int a);
-
-/*
  * Loads the specified message and outputs it to stdout with conversion
  * to HTML and hyperlinks added.
  */
 extern int html_message(const char *list, unsigned int y, unsigned int m, unsigned int d, unsigned int n);
+
+/*
+ * Loads the specified attachment and outputs it to stdout verbatim.
+ */
+extern int html_attachment(const char *list, unsigned int y, unsigned int m, unsigned int d, unsigned int n, unsigned int a);
 
 /*
  * Outputs the message index for the specified day to stdout.
