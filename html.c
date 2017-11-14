@@ -145,36 +145,6 @@ static void buffer_append_filename(struct buffer *dst, const char *fn, int text)
 	buffer_appends(dst, text ? ".txt" : ".bin");
 }
 
-/* Produces output of the same length as input, thus,
- * Content-Length calculation could rely on that assumption. */
-static void buffer_append_obfuscate(struct buffer *dst, const char *what, size_t length)
-{
-	const char *ptr, *end;
-	unsigned char c;
-
-	ptr = what;
-	end = what + length;
-
-	while (ptr < end) {
-		switch ((c = (unsigned char)*ptr++)) {
-		case '@':
-			if (ptr - what >= 2 &&
-			    end - ptr >= 4 &&
-			    *(ptr - 2) > ' ' &&
-			    *ptr > ' ' &&
-			    *(ptr + 1) > ' ' &&
-			    *(ptr + 2) > ' ') {
-				buffer_appends(dst, "@...");
-				ptr += 3;
-				break;
-			}
-			/* FALLTHRU */
-		default:
-			buffer_appendc(dst, c);
-		}
-	}
-}
-
 static void buffer_append_html_generic(struct buffer *dst, const char *what, size_t length, int quotes, int detect_urls)
 {
 	const char *ptr, *end, *url;
@@ -596,11 +566,8 @@ int html_message(const char *list, unsigned int y, unsigned int m, unsigned int 
 				skip = trunc;
 			bend = src.ptr;
 			if (!skip && isattachment) {
+				int text = !strncasecmp(type, "text/", 5);
 				attachment_count++;
-				int text = 0;
-
-				if (!strncasecmp(type, "text/", 5))
-					text = 1;
 				buffer_appendf(&dst, "\n<span style=\"font-family: times;\"><strong>"
 				    "%s attachment \"</strong><a href=\"%u/%u\"%s>",
 				    text ? "View" : "Download", n, attachment_count,
@@ -760,8 +727,6 @@ int html_attachment(const char *list, unsigned int y, unsigned int m, unsigned i
 
 	unsigned int attachment_count = 0;
 	do {
-		int text = 0;
-
 		if (mime.entities->boundary) {
 			body = mime_next_body_part(&mime);
 			if (!body || body >= src.end)
@@ -771,12 +736,12 @@ int html_attachment(const char *list, unsigned int y, unsigned int m, unsigned i
 		if (mime.entities->boundary || !is_attachment(&mime) || ++attachment_count != a) {
 			body = NULL;
 		} else {
-			if (!strncasecmp(mime.entities->type, "text/", 5)) {
+			int text = !strncasecmp(mime.entities->type, "text/", 5);
+			if (text) {
 				buffer_appends(&dst, "Content-Type: text/plain");
 				if (mime.entities->charset && encoding_whitelisted_charset(mime.entities->charset))
 					buffer_appendf(&dst, "; charset=%s", mime.entities->charset);
 				buffer_appendc(&dst, '\n');
-				text = 1;
 			} else {
 				buffer_appends(&dst, "Content-Type: application/octet-stream\n");
 			}
@@ -801,12 +766,8 @@ int html_attachment(const char *list, unsigned int y, unsigned int m, unsigned i
 			continue;
 		}
 
-		buffer_appendf(&dst, "Content-Length: %llu\n", (unsigned long long)(mime.dst.ptr - body));
-		buffer_appendc(&dst, '\n');
-		if (text)
-			buffer_append_obfuscate(&dst, body, mime.dst.ptr - body);
-		else
-			buffer_append(&dst, body, mime.dst.ptr - body);
+		buffer_appendf(&dst, "Content-Length: %llu\n\n", (unsigned long long)(mime.dst.ptr - body));
+		buffer_append(&dst, body, mime.dst.ptr - body);
 
 		mime.dst.ptr = body;
 	} while (bend < src.end && mime.entities);
