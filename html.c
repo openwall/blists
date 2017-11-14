@@ -43,14 +43,13 @@ static int match_domain(const char *hostname, const char *end, const char *domai
 {
 	size_t hostname_length = end - hostname;
 	size_t domain_length = strlen(domain);
-	if (hostname_length < domain_length) return 0;
-	if (strncasecmp(end - domain_length, domain, domain_length)) return 0;
-	return hostname_length == domain_length ||
-	    *(end - domain_length - 1) == '.';
+	if (hostname_length < domain_length ||
+	    strncasecmp(end - domain_length, domain, domain_length))
+		return 0;
+	return hostname_length == domain_length || *(end - domain_length - 1) == '.';
 }
 
-static const char *detect_url(const char *what, const char *colon, const char *end,
-	size_t *url_length, int *safe)
+static const char *detect_url(const char *what, const char *colon, const char *end, size_t *url_length, int *safe)
 {
 	const char *ptr, *url, *hostname;
 
@@ -63,8 +62,10 @@ static const char *detect_url(const char *what, const char *colon, const char *e
 	else
 		return NULL;
 
-	if (end - colon <= 3) return NULL;
-	if (memcmp(colon, "://", 3)) return NULL;
+	if (end - colon <= 3)
+		return NULL;
+	if (memcmp(colon, "://", 3))
+		return NULL;
 
 	ptr = hostname = colon + 3;
 	while (ptr < end &&
@@ -75,7 +76,8 @@ static const char *detect_url(const char *what, const char *colon, const char *e
 		ptr++;
 	while (ptr > hostname && *(ptr - 1) == '.')
 		ptr--;
-	if (ptr <= hostname) return NULL;
+	if (ptr <= hostname)
+		return NULL;
 
 /*
  * We add rel="nofollow" on links to URLs except in safe domains (those
@@ -126,8 +128,7 @@ static const char *detect_url(const char *what, const char *colon, const char *e
 	return url;
 }
 
-static void buffer_append_filename(struct buffer *dst,
-    const char *fn, int text)
+static void buffer_append_filename(struct buffer *dst, const char *fn, int text)
 {
 	size_t i;
 
@@ -146,10 +147,9 @@ static void buffer_append_filename(struct buffer *dst,
 
 /* Produces output of the same length as input, thus,
  * Content-Length calculation could rely on that assumption. */
-static void buffer_append_obfuscate(struct buffer *dst, char *what,
-	size_t length)
+static void buffer_append_obfuscate(struct buffer *dst, const char *what, size_t length)
 {
-	char *ptr, *end;
+	const char *ptr, *end;
 	unsigned char c;
 
 	ptr = what;
@@ -175,8 +175,7 @@ static void buffer_append_obfuscate(struct buffer *dst, char *what,
 	}
 }
 
-static void buffer_append_html_generic(struct buffer *dst, const char *what,
-	size_t length, int quotes, int detect_urls)
+static void buffer_append_html_generic(struct buffer *dst, const char *what, size_t length, int quotes, int detect_urls)
 {
 	const char *ptr, *end, *url;
 	size_t url_length;
@@ -206,21 +205,16 @@ static void buffer_append_html_generic(struct buffer *dst, const char *what,
 		case ':':
 			url = NULL;
 			if (detect_urls && ptr < end && *ptr == '/')
-				url = detect_url(what, ptr - 1, end,
-				    &url_length, &url_safe);
-			if (url && url_length <= MAX_URL_LENGTH &&
-			    dst->ptr - dst->start >= ptr - 1 - url) {
+				url = detect_url(what, ptr - 1, end, &url_length, &url_safe);
+			if (url && url_length <= MAX_URL_LENGTH && dst->ptr - dst->start >= ptr - 1 - url) {
 				dst->ptr -= ptr - 1 - url;
 				buffer_appends(dst, "<a href=\"");
-				buffer_append_html_generic(dst,
-				    url, url_length, 1, 0);
+				buffer_append_html_generic(dst, url, url_length, 1, 0);
 				if (url_safe)
 					buffer_appends(dst, "\">");
 				else
-					buffer_appends(dst,
-					    "\" rel=\"nofollow\">");
-				buffer_append_html_generic(dst,
-				    url, url_length, 0, 0);
+					buffer_appends(dst, "\" rel=\"nofollow\">");
+				buffer_append_html_generic(dst, url, url_length, 0, 0);
 				buffer_appends(dst, "</a>");
 				ptr = url + url_length;
 				break;
@@ -229,8 +223,7 @@ static void buffer_append_html_generic(struct buffer *dst, const char *what,
 			break;
 		case '@':
 			if (ptr - what >= 2 && end - ptr >= 4 &&
-			    *(ptr - 2) > ' ' && *ptr > ' ' &&
-			    *(ptr + 1) > ' ' && *(ptr + 2) > ' ') {
+			    *(ptr - 2) > ' ' && *ptr > ' ' && *(ptr + 1) > ' ' && *(ptr + 2) > ' ') {
 				buffer_appends(dst, "&#64;...");
 				ptr += 3;
 				break;
@@ -275,12 +268,10 @@ int html_error_real(const char *file, unsigned int lineno, const char *msg)
 		msg = "Internal server error";
 
 	if (html_flags & HTML_HEADER)
-		msgt = concat("\n<title>The request has failed: ", msg,
-		    "</title>\n"
+		msgt = concat("\n<title>The request has failed: ", msg, "</title>\n"
 		    "<meta name=\"robots\" content=\"noindex\">\n", NULL);
 	else
-		msgt = concat("\n<p>The request has failed: ", msg,
-		    ".\n", footer, NULL);
+		msgt = concat("\n<p>The request has failed: ", msg, ".\n", footer, NULL);
 
 	write_loop(STDOUT_FILENO, msgt, strlen(msgt));
 	free(msgt);
@@ -327,8 +318,7 @@ static int is_inline(struct mime_ctx *mime)
 	return 0; /* do not show */
 }
 
-int html_message(const char *list,
-	unsigned int y, unsigned int m, unsigned int d, unsigned int n)
+int html_message(const char *list, unsigned int y, unsigned int m, unsigned int d, unsigned int n)
 {
 	unsigned int aday, n0, n2;
 	char *list_file;
@@ -350,7 +340,8 @@ int html_message(const char *list,
 	aday = YMD2ADAY(y - MIN_YEAR, m, d);
 
 	list_file = concat(MAIL_SPOOL_PATH "/", list, NULL);
-	if (!list_file) return html_error(NULL);
+	if (!list_file)
+		return html_error(NULL);
 
 	fd = idx_open(list);
 	if (fd < 0) {
@@ -491,15 +482,19 @@ int html_message(const char *list,
 		mime_free(&mime);
 		return html_error(NULL);
 	}
-	if (*src.ptr == '\n') body = ++src.ptr;
+	if (*src.ptr == '\n')
+		body = ++src.ptr;
 
-	if ((p = subject))
-	while ((p = strchr(p, '['))) {
-		if (strncasecmp(++p, list, strlen(list))) continue;
-		q = p + strlen(list);
-		if (*q != ']') continue;
-		if (*++q == ' ') q++;
-		memmove(--p, q, strlen(q) + 1);
+	if ((p = subject)) {
+		while ((p = strchr(p, '['))) {
+			if (strncasecmp(++p, list, strlen(list)))
+				continue;
+			q = p + strlen(list);
+			if (*q != ']')
+				continue;
+			if (*++q == ' ') q++;
+			memmove(--p, q, strlen(q) + 1);
+		}
 	}
 
 	buffer_appends(&dst, "\n");
@@ -513,8 +508,7 @@ int html_message(const char *list,
 		}
 		buffer_appends(&dst, "</title>\n");
 		if (html_flags & HTML_CENSOR)
-			buffer_appends(&dst,
-			    "<meta name=\"robots\" content=\"noindex\">\n");
+			buffer_appends(&dst, "<meta name=\"robots\" content=\"noindex\">\n");
 	}
 
 	if (html_flags & HTML_BODY) {
@@ -524,16 +518,14 @@ int html_message(const char *list,
 			buffer_appends(&dst, "<a href=\"");
 			if (n == 1)
 				buffer_appendf(&dst, "../../../%u/%02u/%02u/",
-				    MIN_YEAR + idx_msg[0].y,
-				    idx_msg[0].m, idx_msg[0].d);
+				    MIN_YEAR + idx_msg[0].y, idx_msg[0].m, idx_msg[0].d);
 			buffer_appendf(&dst, "%u\">[&lt;prev]</a> ", n0);
 		}
 		if (next) {
 			buffer_appends(&dst, "<a href=\"");
 			if (n2 == 1)
 				buffer_appendf(&dst, "../../../%u/%02u/%02u/",
-				    MIN_YEAR + idx_msg[2].y,
-				    idx_msg[2].m, idx_msg[2].d);
+				    MIN_YEAR + idx_msg[2].y, idx_msg[2].m, idx_msg[2].d);
 			buffer_appendf(&dst, "%u\">[next&gt;]</a> ", n2);
 		}
 		if (idx_msg[1].t.pn) {
@@ -542,10 +534,8 @@ int html_message(const char *list,
 			    idx_msg[1].t.pm != idx_msg[1].m ||
 			    idx_msg[1].t.pd != idx_msg[1].d)
 				buffer_appendf(&dst, "../../../%u/%02u/%02u/",
-				    MIN_YEAR + idx_msg[1].t.py,
-				    idx_msg[1].t.pm, idx_msg[1].t.pd);
-			buffer_appendf(&dst, "%u\">[&lt;thread-prev]</a> ",
-			    idx_msg[1].t.pn);
+				    MIN_YEAR + idx_msg[1].t.py, idx_msg[1].t.pm, idx_msg[1].t.pd);
+			buffer_appendf(&dst, "%u\">[&lt;thread-prev]</a> ", idx_msg[1].t.pn);
 		}
 		if (idx_msg[1].t.nn) {
 			buffer_appends(&dst, "<a href=\"");
@@ -553,10 +543,8 @@ int html_message(const char *list,
 			    idx_msg[1].t.nm != idx_msg[1].m ||
 			    idx_msg[1].t.nd != idx_msg[1].d)
 				buffer_appendf(&dst, "../../../%u/%02u/%02u/",
-				    MIN_YEAR + idx_msg[1].t.ny,
-				    idx_msg[1].t.nm, idx_msg[1].t.nd);
-			buffer_appendf(&dst, "%u\">[thread-next&gt;]</a> ",
-			    idx_msg[1].t.nn);
+				    MIN_YEAR + idx_msg[1].t.ny, idx_msg[1].t.nm, idx_msg[1].t.nd);
+			buffer_appendf(&dst, "%u\">[thread-next&gt;]</a> ", idx_msg[1].t.nn);
 		}
 		buffer_appends(&dst,
 		    "<a href=\".\">[day]</a>"
@@ -564,8 +552,7 @@ int html_message(const char *list,
 		    " <a href=\"../..\">[year]</a>"
 		    " <a href=\"../../..\">[list]</a>\n");
 
-		buffer_appends(&dst,
-		    "<pre style=\"white-space: pre-wrap\">\n");
+		buffer_appends(&dst, "<pre style=\"white-space: pre-wrap\">\n");
 		if (date)
 			buffer_append_header(&dst, date);
 		if (from)
@@ -581,7 +568,8 @@ int html_message(const char *list,
 		do {
 			if (mime.entities->boundary) {
 				body = mime_next_body_part(&mime);
-				if (!body || body >= src.end) break;
+				if (!body || body >= src.end)
+					break;
 				body = mime_next_body(&mime);
 			}
 			if (mime.entities->boundary)
@@ -601,8 +589,7 @@ int html_message(const char *list,
 			const int isinline = is_inline(&mime);
 			int skip = 0;
 
-			body = mime_decode_body(&mime,
-			    isattachment ? RECODE_NO : RECODE_YES, &bend);
+			body = mime_decode_body(&mime, isattachment ? RECODE_NO : RECODE_YES, &bend);
 			if (!body)
 				break;
 			if (bend >= src.end)
@@ -614,11 +601,9 @@ int html_message(const char *list,
 
 				if (!strncasecmp(type, "text/", 5))
 					text = 1;
-				buffer_appendf(&dst,
-				    "\n<span style=\"font-family: times;\"><strong>"
+				buffer_appendf(&dst, "\n<span style=\"font-family: times;\"><strong>"
 				    "%s attachment \"</strong><a href=\"%u/%u\"%s>",
-				    text ? "View" : "Download",
-				    n, attachment_count,
+				    text ? "View" : "Download", n, attachment_count,
 				    text ? "" :  " rel=\"nofollow\" download");
 				if (filename)
 					buffer_appends_html(&dst, filename);
@@ -626,8 +611,7 @@ int html_message(const char *list,
 				buffer_appends_html(&dst, type);
 				buffer_appends(&dst, "<strong>\"");
 				if (body)
-					buffer_appendf(&dst, " (%llu bytes)",
-					    (unsigned long long)(mime.dst.ptr - body));
+					buffer_appendf(&dst, " (%llu bytes)", (unsigned long long)(mime.dst.ptr - body));
 				buffer_appends(&dst, "</strong></span>\n");
 				continue;
 			} else if (!isinline) {
@@ -636,8 +620,7 @@ int html_message(const char *list,
 				skip = 0; /* do not skip non-attachments */
 			}
 			if (skip) {
-				buffer_appends(&dst,
-				    "\n<span style=\"font-family: times;\"><strong>"
+				buffer_appends(&dst, "\n<span style=\"font-family: times;\"><strong>"
 				    "Content of type \"</strong>");
 				buffer_appends_html(&dst, type);
 				buffer_appends(&dst, "<strong>\" skipped</strong></span>\n");
@@ -645,16 +628,13 @@ int html_message(const char *list,
 			}
 			/* inline */
 			buffer_appendc(&dst, '\n');
-			buffer_append_html_generic(&dst, body,
-			    mime.dst.ptr - body, 0, 1);
+			buffer_append_html_generic(&dst, body, mime.dst.ptr - body, 0, 1);
 			mime.dst.ptr = body;
 		} while (bend < src.end && mime.entities);
 
 		if ((html_flags & HTML_CENSOR) || trunc)
-			buffer_appendf(&dst,
-			    "\n<span style=\"font-family: times;\"><strong>"
-			    "Content %s</strong></span>\n",
-			    (html_flags & HTML_CENSOR) ? "removed" : "truncated");
+			buffer_appendf(&dst, "\n<span style=\"font-family: times;\"><strong>"
+			    "Content %s</strong></span>\n", (html_flags & HTML_CENSOR) ? "removed" : "truncated");
 
 		buffer_appends(&dst, "</pre>\n");
 	}
@@ -672,9 +652,7 @@ int html_message(const char *list,
 	return html_send(&dst);
 }
 
-int html_attachment(const char *list,
-	unsigned int y, unsigned int m, unsigned int d, unsigned int n,
-	unsigned int a)
+int html_attachment(const char *list, unsigned int y, unsigned int m, unsigned int d, unsigned int n, unsigned int a)
 {
 	unsigned int aday;
 	char *list_file;
@@ -696,7 +674,8 @@ int html_attachment(const char *list,
 	aday = YMD2ADAY(y - MIN_YEAR, m, d);
 
 	list_file = concat(MAIL_SPOOL_PATH "/", list, NULL);
-	if (!list_file) return html_error(NULL);
+	if (!list_file)
+		return html_error(NULL);
 
 	fd = idx_open(list);
 	if (fd < 0) {
@@ -776,7 +755,8 @@ int html_attachment(const char *list,
 		mime_free(&mime);
 		return html_error(NULL);
 	}
-	if (*src.ptr == '\n') body = ++src.ptr;
+	if (*src.ptr == '\n')
+		body = ++src.ptr;
 
 	unsigned int attachment_count = 0;
 	do {
@@ -784,61 +764,47 @@ int html_attachment(const char *list,
 
 		if (mime.entities->boundary) {
 			body = mime_next_body_part(&mime);
-			if (!body || body >= src.end) break;
+			if (!body || body >= src.end)
+				break;
 			body = mime_next_body(&mime);
 		}
-		if (mime.entities->boundary)
+		if (mime.entities->boundary || !is_attachment(&mime) || ++attachment_count != a) {
 			body = NULL;
-		else {
-			if (!is_attachment(&mime) ||
-			    ++attachment_count != a)
-				body = NULL;
-			else {
-				if (!strncasecmp(mime.entities->type, "text/", 5)) {
-					buffer_appends(&dst,
-					    "Content-Type: text/plain");
-					if (mime.entities->charset &&
-					    encoding_whitelisted_charset(mime.entities->charset))
-						buffer_appendf(&dst,
-						    "; charset=%s",
-						    mime.entities->charset);
-					buffer_appendc(&dst, '\n');
-					text = 1;
-				} else
-					buffer_appends(&dst,
-					    "Content-Type: application/octet-stream\n");
-				buffer_appendf(&dst,
-				    "Content-Disposition: %s;"
-				    " filename=\"",
-				    text ? "inline" : "attachment");
-				buffer_append_filename(&dst,
-				    mime.entities->filename, text);
-				buffer_appends(&dst, "\"\n");
+		} else {
+			if (!strncasecmp(mime.entities->type, "text/", 5)) {
+				buffer_appends(&dst, "Content-Type: text/plain");
+				if (mime.entities->charset && encoding_whitelisted_charset(mime.entities->charset))
+					buffer_appendf(&dst, "; charset=%s", mime.entities->charset);
+				buffer_appendc(&dst, '\n');
+				text = 1;
+			} else {
+				buffer_appends(&dst, "Content-Type: application/octet-stream\n");
 			}
+			buffer_appendf(&dst, "Content-Disposition: %s; filename=\"", text ? "inline" : "attachment");
+			buffer_append_filename(&dst, mime.entities->filename, text);
+			buffer_appends(&dst, "\"\n");
 		}
 		if (body) {
 			body = mime_decode_body(&mime, RECODE_NO, &bend);
 			if (bend >= src.end) {
 				dst.ptr = dst.start;
-				buffer_appendf(&dst,
-				    "Status: 404 Not Found\n\n"
-				    "Attachment is truncated.\n");
+				buffer_appendf(&dst, "Status: 404 Not Found\n\nAttachment is truncated.\n");
 				break;
 			}
-			if (!body) break;
+			if (!body)
+				break;
 			bend = src.ptr;
 		} else {
 			bend = mime_skip_body(&mime);
-			if (!bend) break;
+			if (!bend)
+				break;
 			continue;
 		}
 
-		buffer_appendf(&dst, "Content-Length: %llu\n",
-		    (unsigned long long)(mime.dst.ptr - body));
+		buffer_appendf(&dst, "Content-Length: %llu\n", (unsigned long long)(mime.dst.ptr - body));
 		buffer_appendc(&dst, '\n');
 		if (text)
-			buffer_append_obfuscate(&dst, body,
-			   mime.dst.ptr - body);
+			buffer_append_obfuscate(&dst, body, mime.dst.ptr - body);
 		else
 			buffer_append(&dst, body, mime.dst.ptr - body);
 
@@ -859,8 +825,7 @@ int html_attachment(const char *list,
 }
 
 /* output From and Subject strings */
-static void output_strings(struct buffer *dst, struct idx_message *m,
-    int close_a)
+static void output_strings(struct buffer *dst, struct idx_message *m, int close_a)
 {
 	char *from, *subj;
 	int from_len, subj_len;
@@ -870,24 +835,23 @@ static void output_strings(struct buffer *dst, struct idx_message *m,
 	from_len = strnlen(from, sizeof(m->strings));
 
 	subj = m->strings + from_len + 1;
-	if (from_len + 1 < sizeof(m->strings)) {
+	if (from_len + 1 < sizeof(m->strings))
 		subj_len = strnlen(subj, sizeof(m->strings) - from_len - 1);
-	} else
+	else
 		subj_len = 0;
 
 	if (subj_len) {
-		trunc = (m->flags & IDX_F_SUBJECT_TRUNC) ||
-			encoding_utf8_remove_trailing_partial_character(subj, &subj_len);
+		trunc = (m->flags & IDX_F_SUBJECT_TRUNC) || encoding_utf8_remove_trailing_partial_character(subj, &subj_len);
 		buffer_append_html(dst, subj, subj_len);
 		if (trunc)
 			buffer_appends(dst, "&hellip;");
-	} else
+	} else {
 		buffer_appends(dst, "(no subject)");
+	}
 	if (close_a)
 		buffer_appends(dst, "</a>");
 	buffer_appends(dst, " (");
-	trunc = (m->flags & IDX_F_FROM_TRUNC) ||
-		encoding_utf8_remove_trailing_partial_character(from, &from_len);
+	trunc = (m->flags & IDX_F_FROM_TRUNC) || encoding_utf8_remove_trailing_partial_character(from, &from_len);
 	buffer_append_html(dst, from, from_len);
 	if (trunc)
 		buffer_appends(dst, "&hellip;");
@@ -936,8 +900,9 @@ int html_day_index(const char *list, unsigned int y, unsigned int m, unsigned in
 		size += sizeof(struct idx_message);
 		idx_offset -= sizeof(struct idx_message);
 		prev = 1;
-	} else
+	} else {
 		prev = 0;
+	}
 
 	/* read one more entry for Next day quick link */
 	size_n = size + sizeof(struct idx_message);
@@ -961,25 +926,20 @@ int html_day_index(const char *list, unsigned int y, unsigned int m, unsigned in
 	if (html_flags & HTML_HEADER) {
 		buffer_appends(&dst, "<title>");
 		buffer_appends_html(&dst, list);
-		buffer_appendf(&dst, " mailing list - %u/%02u/%02u</title>\n",
-		    y, m, d);
+		buffer_appendf(&dst, " mailing list - %u/%02u/%02u</title>\n", y, m, d);
 	}
 
 	if (html_flags & HTML_BODY) {
 		int i;
 		if (prev) {
 			buffer_appends(&dst, "<a href=\"");
-			buffer_appendf(&dst,
-			    "../../../%u/%02u/%02u/\">[&lt;prev day]</a> ",
-			    MIN_YEAR + mp[0].y,
-			    mp[0].m, mp[0].d);
+			buffer_appendf(&dst, "../../../%u/%02u/%02u/\">[&lt;prev day]</a> ",
+			    MIN_YEAR + mp[0].y, mp[0].m, mp[0].d);
 		}
 		if (next) {
 			buffer_appends(&dst, "<a href=\"");
-			buffer_appendf(&dst,
-			    "../../../%u/%02u/%02u/\">[next day&gt;]</a> ",
-			    MIN_YEAR + mp[next].y,
-			    mp[next].m, mp[next].d);
+			buffer_appendf(&dst, "../../../%u/%02u/%02u/\">[next day&gt;]</a> ",
+			    MIN_YEAR + mp[next].y, mp[next].m, mp[next].d);
 		}
 		buffer_appends(&dst,
 		    "<a href=\"..\">[month]</a>"
@@ -988,8 +948,7 @@ int html_day_index(const char *list, unsigned int y, unsigned int m, unsigned in
 
 		buffer_appends(&dst, "<p><h2>");
 		buffer_appends_html(&dst, list);
-		buffer_appendf(&dst, " mailing list - %u/%02u/%02u</h2>\n",
-		    y, m, d);
+		buffer_appendf(&dst, " mailing list - %u/%02u/%02u</h2>\n", y, m, d);
 
 		if (count)
 			buffer_appends(&dst, "<ul>\n");
@@ -1003,8 +962,7 @@ int html_day_index(const char *list, unsigned int y, unsigned int m, unsigned in
 		if (count)
 			buffer_appends(&dst, "</ul>\n");
 
-		buffer_appendf(&dst, "<p>%u message%s\n",
-		    count, count == 1 ? "" : "s");
+		buffer_appendf(&dst, "<p>%u message%s\n", count, count == 1 ? "" : "s");
 	}
 
 	free(mp);
@@ -1022,18 +980,14 @@ static int dayofweek(unsigned int y, unsigned int m, unsigned int d)
 }
 
 typedef enum { L_MONTHLY, L_DAILY } html_date_level_t;
-static void html_output_month_cal(struct buffer *pdst, idx_msgnum_t *mn,
-    unsigned int y, unsigned int m, html_date_level_t level)
+static void html_output_month_cal(struct buffer *pdst, idx_msgnum_t *mn, unsigned int y, unsigned int m, html_date_level_t level)
 {
 	unsigned int d;
 	idx_msgnum_t mp, count;
 
-	/* "Monday is the first day of the week according to the
-	 * international standard ISO 8601" */
+	/* "Monday is the first day of the week according to the international standard ISO 8601" */
 	enum { SUNDAY, MONDAY } weekstart = MONDAY;
-	buffer_appendf(pdst,
-	    "\n<table border=0 class=cal_mon><tr>"
-	    "%s<th>Mon<th>Tue<th>Wed<th>Thu<th>Fri<th>Sat%s",
+	buffer_appendf(pdst, "\n<table border=0 class=cal_mon><tr>%s<th>Mon<th>Tue<th>Wed<th>Thu<th>Fri<th>Sat%s",
 	    weekstart == SUNDAY ? "<th>Sun" : "",
 	    weekstart == MONDAY ? "<th>Sun" : "");
 
@@ -1061,14 +1015,12 @@ static void html_output_month_cal(struct buffer *pdst, idx_msgnum_t *mn,
 				buffer_appends(pdst, "<a href=\"");
 				if (level <= L_MONTHLY)
 					buffer_appendf(pdst, "%02u/", m);
-				buffer_appendf(pdst, "%02u/\">%u</a>",
-				    d, count);
+				buffer_appendf(pdst, "%02u/\">%u</a>", d, count);
 			}
 			mp = mn[d];
 		}
 		if (d == daysinmonth && 7 - col - 1 > 0)
-			buffer_appendf(pdst, "<td colspan=\"%u\">",
-			    7 - col - 1);
+			buffer_appendf(pdst, "<td colspan=\"%u\">", 7 - col - 1);
 	}
 	buffer_appends(pdst, "\n</table>\n");
 }
@@ -1104,7 +1056,8 @@ int html_month_index(const char *list, unsigned int y, unsigned int m)
 	first = 0;
 	mp = mn[0];
 	for (d = 1; d <= 31; d++) {
-		if (!mn[d]) continue;
+		if (!mn[d])
+			continue;
 		if (mp > 0) {
 			/* Remember index of first message */
 			if (first == 0)
@@ -1162,15 +1115,13 @@ int html_month_index(const char *list, unsigned int y, unsigned int m)
 	if (html_flags & HTML_BODY) {
 		if (prev) {
 			buffer_appends(&dst, "<a href=\"");
-			buffer_appendf(&dst,
-			    "../../%u/%02u/\">[&lt;prev month]</a> ",
+			buffer_appendf(&dst, "../../%u/%02u/\">[&lt;prev month]</a> ",
 			    MIN_YEAR + msgp[0].y, msgp[0].m);
 
 		}
 		if (next) {
 			buffer_appends(&dst, "<a href=\"");
-			buffer_appendf(&dst,
-			    "../../%u/%02u/\">[next month&gt;]</a> ",
+			buffer_appendf(&dst, "../../%u/%02u/\">[next month&gt;]</a> ",
 			    MIN_YEAR + msgp[next].y, msgp[next].m);
 
 		}
@@ -1194,7 +1145,8 @@ int html_month_index(const char *list, unsigned int y, unsigned int m)
 		dp = 0;
 		mp = mn[0];
 		for (d = 1; d <= 31; d++) {
-			if (!mn[d]) continue;
+			if (!mn[d])
+				continue;
 			if (mp > 0) {
 				if (mn[d] > 0)
 					count = mn[d] - mp;
@@ -1206,8 +1158,7 @@ int html_month_index(const char *list, unsigned int y, unsigned int m)
 					return html_error(NULL);
 				}
 				if (!total)
-					buffer_appends(&dst,
-					    "<p>Messages by day:\n<p>\n");
+					buffer_appends(&dst, "<p>Messages by day:\n<p>\n");
 				total += count;
 
 				buffer_appendf(&dst, "<b>%s %u</b> "
@@ -1223,18 +1174,13 @@ int html_month_index(const char *list, unsigned int y, unsigned int m)
 					maxn--;
 
 				for (n = 1; n <= maxn; n++) {
-					buffer_appendf(&dst,
-					    "<li><a href=\"%02u/%u\">",
-					    dp + 1, n);
+					buffer_appendf(&dst, "<li><a href=\"%02u/%u\">", dp + 1, n);
 					output_strings(&dst, msg++, 1);
 					buffer_appends(&dst, "\n");
 				}
 				msg += count - maxn;
 				if (count > MAX_SHORT_MSG_LIST)
-					buffer_appendf(&dst, "<li>"
-					    "<a href=\"%02u/\">"
-					    "%u more messages"
-					    "</a>\n", d, count - maxn);
+					buffer_appendf(&dst, "<li><a href=\"%02u/\">%u more messages</a>\n", d, count - maxn);
 				buffer_appends(&dst, "</ul>\n");
 			}
 			mp = mn[d];
@@ -1242,8 +1188,7 @@ int html_month_index(const char *list, unsigned int y, unsigned int m)
 		}
 
 		if (total)
-			buffer_appendf(&dst, "<p>%u message%s\n",
-			    total, total == 1 ? "" : "s");
+			buffer_appendf(&dst, "<p>%u message%s\n", total, total == 1 ? "" : "s");
 		else
 			buffer_appends(&dst, "<p>No messages\n");
 	}
@@ -1275,8 +1220,7 @@ int html_year_index(const char *list, unsigned int y)
 
 	fd = idx_open(list);
 	if (fd < 0)
-		return html_error(errno == ENOENT ?
-		    "No such mailing list" : NULL);
+		return html_error(errno == ENOENT ? "No such mailing list" : NULL);
 
 	if (!(mn = malloc(mn_size)) ||
 	    !idx_read_aday_ok(fd, aday, mn, mn_size)) {
@@ -1291,7 +1235,7 @@ int html_year_index(const char *list, unsigned int y)
 	rday = YMD2ADAY(min_y - MIN_YEAR, 1, 1) - aday;
 	unsigned int eday = YMD2ADAY(max_y - MIN_YEAR + 1, 1, 1) - aday;
 	int sanity = 0;
-	for (; rday < eday; rday++)
+	for (; rday < eday; rday++) {
 		if (mn[rday] > 0) {
 			if (!first)
 				first = mn[rday];
@@ -1308,6 +1252,7 @@ int html_year_index(const char *list, unsigned int y)
 			}
 			sanity = lastn;
 		}
+	}
 	int prev = 0;
 	int next = 0;
 	if (first || lastn) {
@@ -1344,7 +1289,7 @@ int html_year_index(const char *list, unsigned int y)
 		/* resolve to message number in the day and cache in offset field */
 		rday = YMD2ADAY(min_y - MIN_YEAR, 1, 1) - aday;
 		i = 0;
-		for (; rday < eday; rday++)
+		for (; rday < eday; rday++) {
 			if (mn[rday] > 0 && recent_offset >= mn[rday]) {
 				count = aday_count(&mn[rday]);
 				while (recent_offset < (mn[rday] + count)) {
@@ -1355,6 +1300,7 @@ int html_year_index(const char *list, unsigned int y)
 						break;
 				}
 			}
+		}
 	}
 	if (idx_close(fd) || buffer_init(&dst, 0)) {
 		free(msg);
@@ -1374,14 +1320,10 @@ int html_year_index(const char *list, unsigned int y)
 	}
 
 	if (html_flags & HTML_BODY) {
-		if (prev) {
-			buffer_appendf(&dst,
-			    "<a href=\"../%u/\">[prev year]</a>\n", prev);
-		}
-		if (next) {
-			buffer_appendf(&dst,
-			    "<a href=\"../%u/\">[next year]</a>\n", next);
-		}
+		if (prev)
+			buffer_appendf(&dst, "<a href=\"../%u/\">[prev year]</a>\n", prev);
+		if (next)
+			buffer_appendf(&dst, "<a href=\"../%u/\">[next year]</a>\n", next);
 		if (min_y == max_y)
 			buffer_appends(&dst, "<a href=\"..\">[list]</a>\n");
 
@@ -1391,7 +1333,6 @@ int html_year_index(const char *list, unsigned int y)
 		if (min_y == max_y)
 			buffer_appendf(&dst, " - %u", y);
 		buffer_appends(&dst, "</h2>\n");
-
 
 		total = 0;
 		/* output short year-o-month index */
@@ -1403,7 +1344,8 @@ int html_year_index(const char *list, unsigned int y)
 			for (m = 1; m <= 12; m++) {
 				monthly_total = 0;
 				for (d = 1; d <= 31; d++, rday++) {
-					if (mn[rday] <= 0) continue;
+					if (mn[rday] <= 0)
+						continue;
 					if (mn[rday + 1] > 0)
 						count = mn[rday + 1] - mn[rday];
 					else
@@ -1420,19 +1362,16 @@ int html_year_index(const char *list, unsigned int y)
 					    "<th>Apr<th>May<th>Jun"
 					    "<th>Jul<th>Aug<th>Sep"
 					    "<th>Oct<th>Nov<th>Dec\n");
-
 					o_header++;
 				}
 				if (o_year != y) {
-					if (o_month >= 0)
-						for (o_month++; o_month <= 12;
-						    o_month++)
-							buffer_appends(&dst,
-							    "<td>&nbsp;");
+					if (o_month >= 0) {
+						for (o_month++; o_month <= 12; o_month++)
+							buffer_appends(&dst, "<td>&nbsp;");
+					}
 					buffer_appendf(&dst, "\n<tr><td>");
 					if (min_y != max_y)
-						buffer_appendf(&dst,
-						    "<a href=\"%u/\">", y);
+						buffer_appendf(&dst, "<a href=\"%u/\">", y);
 					buffer_appendf(&dst, "<b>%4u</b>", y);
 					if (min_y != max_y)
 						buffer_appends(&dst, "</a>");
@@ -1444,17 +1383,16 @@ int html_year_index(const char *list, unsigned int y)
 				buffer_appendf(&dst, "<td><a href=\"");
 				if (min_y != max_y)
 					buffer_appendf(&dst, "%u/", y);
-				buffer_appendf(&dst, "%02u/\">%u</a>",
-				    m, monthly_total);
+				buffer_appendf(&dst, "%02u/\">%u</a>", m, monthly_total);
 				o_month = m;
-
 				total += monthly_total;
 			}
 		}
 		if (o_header) {
-			if (o_year)
+			if (o_year) {
 				for (o_month++; o_month <= 12; o_month++)
 					buffer_appends(&dst, "<td>&nbsp;");
+			}
 			buffer_appends(&dst, "\n</table>\n");
 		}
 
@@ -1477,31 +1415,25 @@ int html_year_index(const char *list, unsigned int y)
 		/* output monthly calendars */
 		if (min_y == max_y) {
 			y = min_y;
-			buffer_appends(&dst,
-			    "\n<p>\n<table border=0 class=cal_big>");
+			buffer_appends(&dst, "\n<p>\n<table border=0 class=cal_big>");
 			for (m = 1; m <= 12; m++) {
 				rday = YMD2ADAY(y - MIN_YEAR, m, 1) - aday;
 				if (m % 3 == 1) {
 					unsigned int n;
-
 					buffer_appends(&dst, "\n<tr>");
 					for (n = m; n < m + 3; n++)
-						buffer_appendf(&dst,
-						    "<th><a href=\"%02u/\">%s</a>",
-						    n, month_name[n - 1]);
+						buffer_appendf(&dst, "<th><a href=\"%02u/\">%s</a>", n, month_name[n - 1]);
 					buffer_appends(&dst, "\n<tr>");
 				}
 
 				buffer_appends(&dst, "<td valign=\"top\">");
-				html_output_month_cal(&dst, &mn[rday],
-				    y, m, L_MONTHLY);
+				html_output_month_cal(&dst, &mn[rday], y, m, L_MONTHLY);
 			}
 			buffer_appends(&dst, "</table>");
 		}
 
 		if (total)
-			buffer_appendf(&dst, "<p>%u message%s\n",
-			    total, total == 1 ? "" : "s");
+			buffer_appendf(&dst, "<p>%u message%s\n", total, total == 1 ? "" : "s");
 		else
 			buffer_appends(&dst, "<p>No messages\n");
 	} /* HTML_BODY */
