@@ -30,7 +30,7 @@ static const char *charset_whitelist[] = {
 	"koi8-u$",
 	"windows-",
 	"cp",
-	"utf-8", /* expected to be redundant with check for UTF8_CHARSET */
+	"utf-8", /* redundant in enc_to_utf8(), may be needed elsewhere */
 	NULL
 };
 
@@ -99,7 +99,7 @@ int enc_to_utf8(struct buffer *dst, struct buffer *enc, const char *charset)
 		charset = UNKNOWN_CHARSET;
 	}
 
-	if (!strcasecmp(UTF8_CHARSET, charset) ||
+	if (!strcasecmp(UTF8_CHARSET, charset) /* no recoding needed */ ||
 	    !enc_allowed_charset(charset)) {
 		buffer_append(dst, iptr, inlen);
 	} else {
