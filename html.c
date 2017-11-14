@@ -26,8 +26,6 @@
 
 int html_flags = HTML_BODY;
 
-#define MAX_FILENAME_LEN	100
-
 /* Please don't remove this (although you may) */
 static const char * const footer =
 	"<p><a href=\"http://www.openwall.com/blists/\">Powered by blists</a>"
@@ -135,7 +133,7 @@ static void buffer_append_filename(struct buffer *dst,
 
 	if (!fn || !*fn)
 		fn = "attachment";
-	for (i = 0; i < MAX_FILENAME_LEN && *fn; ++fn, ++i) {
+	for (i = 0; i < MAX_FILENAME_LENGTH && *fn; ++fn, ++i) {
 		if ((*fn >= '0' && *fn <= '9') ||
 		    (*fn >= 'a' && *fn <= 'z') ||
 		    (*fn >= 'A' && *fn <= 'Z'))

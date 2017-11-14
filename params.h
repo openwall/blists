@@ -26,14 +26,20 @@
 #define INDEX_FILENAME_SUFFIX		".idx"
 
 /*
- * Truncate messages larger than the maximum size at this size.
+ * Maximum message size in bytes (longer ones are truncated at this size).
  */
 #define MAX_MESSAGE_SIZE		(10 * 1024 * 1024)
 
 /*
+ * Maximum attachment filename length (longer ones are truncated at this
+ * length) prior to appending the .txt or .bin suffix.
+ */
+#define MAX_FILENAME_LENGTH		100
+
+/*
  * Don't turn URLs longer than this number of characters into hyperlinks.
  */
-#define MAX_URL_LENGTH			1024
+#define MAX_URL_LENGTH			1000
 
 /*
  * Maximum number of messages per day on month index pages.
