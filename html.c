@@ -268,7 +268,7 @@ static void buffer_append_header(struct buffer *dst, char *what)
 	buffer_appendc(dst, '\n');
 }
 
-int html_error_real(const char *file, int lineno, const char *msg)
+int html_error_real(const char *file, unsigned int lineno, const char *msg)
 {
 	char loc[128];
 	char *msgt;
@@ -287,7 +287,7 @@ int html_error_real(const char *file, int lineno, const char *msg)
 	write_loop(STDOUT_FILENO, msgt, strlen(msgt));
 	free(msgt);
 
-	snprintf(loc, sizeof(loc), " (%s:%d)", file, lineno);
+	snprintf(loc, sizeof(loc), " (%s:%u)", file, lineno);
 	msgt = concat("The request has failed: ", msg, loc, "\n", NULL);
 	write_loop(STDERR_FILENO, msgt, strlen(msgt));
 	free(msgt);
@@ -1050,8 +1050,8 @@ static void html_output_month_cal(struct buffer *pdst, idx_msgnum_t *mn,
 		if (d == 1 || col == 0)
 			buffer_appends(pdst, "\n<tr>");
 		if (d == 1 && col > 0)
-			buffer_appendf(pdst, "<td colspan=\"%d\">", col);
-		buffer_appendf(pdst, "<td><sup><b>%d</b></sup> ", d);
+			buffer_appendf(pdst, "<td colspan=\"%u\">", col);
+		buffer_appendf(pdst, "<td><sup><b>%u</b></sup>", d);
 		if (mn[d]) {
 			if (mp > 0) {
 				if (mn[d] > 0)
@@ -1069,7 +1069,7 @@ static void html_output_month_cal(struct buffer *pdst, idx_msgnum_t *mn,
 			mp = mn[d];
 		}
 		if (d == daysinmonth && 7 - col - 1 > 0)
-			buffer_appendf(pdst, "<td colspan=\"%d\">",
+			buffer_appendf(pdst, "<td colspan=\"%u\">",
 			    7 - col - 1);
 	}
 	buffer_appends(pdst, "\n</table>\n");
