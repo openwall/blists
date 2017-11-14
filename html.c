@@ -738,7 +738,7 @@ int html_attachment(const char *list, unsigned int y, unsigned int m, unsigned i
 			int text = !strncasecmp(mime.entities->type, "text/", 5);
 			if (text) {
 				buffer_appends(&dst, "Content-Type: text/plain");
-				if (mime.entities->charset && encoding_whitelisted_charset(mime.entities->charset))
+				if (mime.entities->charset && enc_allowed_charset(mime.entities->charset))
 					buffer_appendf(&dst, "; charset=%s", mime.entities->charset);
 				buffer_appendc(&dst, '\n');
 			} else {
@@ -801,7 +801,7 @@ static void output_strings(struct buffer *dst, struct idx_message *m, int close_
 		subj_len = 0;
 
 	if (subj_len) {
-		trunc = (m->flags & IDX_F_SUBJECT_TRUNC) || encoding_utf8_remove_trailing_partial_character(subj, &subj_len);
+		trunc = (m->flags & IDX_F_SUBJECT_TRUNC) || enc_utf8_remove_partial(subj, &subj_len);
 		buffer_append_html(dst, subj, subj_len);
 		if (trunc)
 			buffer_appends(dst, "&hellip;");
@@ -811,7 +811,7 @@ static void output_strings(struct buffer *dst, struct idx_message *m, int close_
 	if (close_a)
 		buffer_appends(dst, "</a>");
 	buffer_appends(dst, " (");
-	trunc = (m->flags & IDX_F_FROM_TRUNC) || encoding_utf8_remove_trailing_partial_character(from, &from_len);
+	trunc = (m->flags & IDX_F_FROM_TRUNC) || enc_utf8_remove_partial(from, &from_len);
 	buffer_append_html(dst, from, from_len);
 	if (trunc)
 		buffer_appends(dst, "&hellip;");

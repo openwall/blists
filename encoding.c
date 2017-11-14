@@ -61,7 +61,7 @@ static int match_charset(const char *charset, const char *mask)
 	return !*charset;
 }
 
-int encoding_whitelisted_charset(const char *charset)
+int enc_allowed_charset(const char *charset)
 {
 	const char **p;
 
@@ -72,7 +72,7 @@ int encoding_whitelisted_charset(const char *charset)
 }
 
 /* convert text from `enc' buffer to `dst' by `charset' */
-int encoding_to_utf8(struct buffer *dst, struct buffer *enc, const char *charset)
+int enc_to_utf8(struct buffer *dst, struct buffer *enc, const char *charset)
 {
 	char *iptr = enc->start;
 	size_t inlen = enc->ptr - enc->start;
@@ -100,7 +100,7 @@ int encoding_to_utf8(struct buffer *dst, struct buffer *enc, const char *charset
 	}
 
 	if (!strcasecmp(UTF8_CHARSET, charset) ||
-	    !encoding_whitelisted_charset(charset)) {
+	    !enc_allowed_charset(charset)) {
 		buffer_append(dst, iptr, inlen);
 	} else {
 		iconv_t cd = iconv_open(UTF8_CHARSET, charset);
@@ -134,10 +134,9 @@ int encoding_to_utf8(struct buffer *dst, struct buffer *enc, const char *charset
 	return dst->error;
 }
 
-/* remove partial utf8 character from string by reducing its len */
-/* return how many bytes are removed, *lenp is modified to reflect new
- * length */
-int encoding_utf8_remove_trailing_partial_character(char *ptr, int *lenp)
+/* remove trailing partial utf8 character from string by reducing its len */
+/* return how many bytes are removed, *lenp is modified to reflect new length */
+int enc_utf8_remove_partial(char *ptr, int *lenp)
 {
 	int len;
 
