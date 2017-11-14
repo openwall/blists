@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2006,2008,2009 Solar Designer <solar at openwall.com>
- * Copyright (c) 2011 ABC <abc at openwall.com>
+ * Copyright (c) 2006,2008,2009,2015,2017 Solar Designer <solar at openwall.com>
+ * Copyright (c) 2011,2014,2017 ABC <abc at openwall.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted.

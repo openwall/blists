@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2006,2008 Solar Designer <solar at openwall.com>
- * Copyright (c) 2011 ABC <abc at openwall.com>
+ * Copyright (c) 2006,2008,2017 Solar Designer <solar at openwall.com>
+ * Copyright (c) 2011,2017 ABC <abc at openwall.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted.
@@ -30,22 +30,18 @@ extern int html_error_real(const char *file, unsigned int lineno, const char *ms
 /*
  * Loads the specified attachment and outputs it to stdout verbatim.
  */
-extern int html_attachment(const char *list,
-	unsigned int y, unsigned int m, unsigned int d, unsigned int n,
-	unsigned int a);
+extern int html_attachment(const char *list, unsigned int y, unsigned int m, unsigned int d, unsigned int n, unsigned int a);
 
 /*
  * Loads the specified message and outputs it to stdout with conversion
  * to HTML and hyperlinks added.
  */
-extern int html_message(const char *list,
-	unsigned int y, unsigned int m, unsigned int d, unsigned int n);
+extern int html_message(const char *list, unsigned int y, unsigned int m, unsigned int d, unsigned int n);
 
 /*
  * Outputs the message index for the specified day to stdout.
  */
-extern int html_day_index(const char *list, unsigned int y, unsigned int m,
-	unsigned int d);
+extern int html_day_index(const char *list, unsigned int y, unsigned int m, unsigned int d);
 
 /*
  * Outputs the message index for the specified month to stdout.
