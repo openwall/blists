@@ -82,7 +82,8 @@ int lock_fd(int fd, int shared)
 	l.l_type = shared ? F_RDLCK : F_WRLCK;
 	logtty("Waiting for the lock...\n");
 	while (fcntl(fd, F_SETLKW, &l)) {
-		if (errno != EBUSY) return -1;
+		if (errno != EBUSY)
+			return -1;
 		sleep_select(1, 0);
 	}
 #endif
@@ -90,7 +91,8 @@ int lock_fd(int fd, int shared)
 #if LOCK_FLOCK
 	logtty("Waiting for the lock...\n");
 	while (flock(fd, shared ? LOCK_SH : LOCK_EX)) {
-		if (errno != EBUSY) return -1;
+		if (errno != EBUSY)
+			return -1;
 		sleep_select(1, 0);
 	}
 #endif
@@ -106,11 +108,13 @@ int unlock_fd(int fd)
 	memset(&l, 0, sizeof(l));
 	l.l_whence = SEEK_SET;
 	l.l_type = F_UNLCK;
-	if (fcntl(fd, F_SETLK, &l)) return -1;
+	if (fcntl(fd, F_SETLK, &l))
+		return -1;
 #endif
 
 #if LOCK_FLOCK
-	if (flock(fd, LOCK_UN)) return -1;
+	if (flock(fd, LOCK_UN))
+		return -1;
 #endif
 
 	return 0;
@@ -126,8 +130,10 @@ int read_loop(int fd, void *buffer, int count)
 	while (count > 0) {
 		block = read(fd, (char *)buffer + offset, count);
 
-		if (block < 0) return block;
-		if (!block) return offset;
+		if (block < 0)
+			return block;
+		if (!block)
+			return offset;
 
 		offset += block;
 		count -= block;
@@ -149,8 +155,10 @@ int write_loop(int fd, const void *buffer, int count)
  * failed to do its job.  We don't even ignore EINTR here.  We also don't
  * retry when a write(2) returns zero, as we could start eating up the
  * CPU if we did. */
-		if (block < 0) return block;
-		if (!block) return offset;
+		if (block < 0)
+			return block;
+		if (!block)
+			return offset;
 
 		offset += block;
 		count -= block;
@@ -172,20 +180,24 @@ char *concat(const char *s1, ...)
 	va_start(args, s1);
 	while ((s = va_arg(args, char *))) {
 		l = strlen(s);
-		if ((m += l) < l) break;
+		if ((m += l) < l)
+			break;
 	}
 	va_end(args);
-	if (s || m >= INT_MAX) return NULL;
+	if (s || m >= INT_MAX)
+		return NULL;
 
 	result = (char *)malloc(m + 1);
-	if (!result) return NULL;
+	if (!result)
+		return NULL;
 
 	memcpy(p = result, s1, n);
 	p += n;
 	va_start(args, s1);
 	while ((s = va_arg(args, char *))) {
 		l = strlen(s);
-		if ((n += l) < l || n > m) break;
+		if ((n += l) < l || n > m)
+			break;
 		memcpy(p, s, l);
 		p += l;
 	}
