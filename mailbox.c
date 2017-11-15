@@ -396,9 +396,8 @@ static int mailbox_parse_fd(int fd)
 	unindexed_size = stat.st_size - inc_ofs;
 	if (!unindexed_size)
 		return 0;
-	if (unindexed_size < 0 || !S_ISREG(stat.st_mode))
-		return 1;
-	if (stat.st_size > MAX_MAILBOX_BYTES || (stat.st_size >> (sizeof(off_t) * 8 - 1)))
+	if (unindexed_size < 0 || !S_ISREG(stat.st_mode) ||
+	    stat.st_size > MAX_MAILBOX_BYTES || (stat.st_size >> (sizeof(off_t) * 8 - 1)))
 		return 1;
 
 	memset(&msg, 0, sizeof(msg));
