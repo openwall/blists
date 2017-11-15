@@ -768,7 +768,7 @@ int mailbox_parse(char *mailbox)
 		idx_fd = open(idx, O_CREAT | O_WRONLY, 0644);
 	free(idx);
 
-	error = idx_fd < 0;
+	error |= idx_fd < 0;
 
 	if (inc_ofs <= 0) {
 		inc_ofs = 0;
