@@ -381,38 +381,26 @@ static int decode_header(struct mime_ctx *ctx, const char *header, size_t length
 			continue;
 		q = p;
 		charset = ++q;
-		if (q >= end)
-			continue;
-		if (!istokenchar(*q++))
+		if (q >= end || !istokenchar(*q++))
 			continue;
 		while (q < end && istokenchar(*q))
 			q++;
-		if (q >= end)
-			continue;
-		if (*q++ != '?')
+		if (q >= end || *q++ != '?')
 			continue;
 		if (q >= end)
 			continue;
 		if (*q != 'q' && *q != 'Q' && *q != 'B' && *q != 'b')
 			continue;
 		encoding = q++;
-		if (q >= end)
+		if (q >= end || *q++ != '?')
 			continue;
-		if (*q++ != '?')
-			continue;
-		if (q >= end)
-			continue;
-		if (!isencodedchar(*q++))
+		if (q >= end || !isencodedchar(*q++))
 			continue;
 		while (q < end && isencodedchar(*q))
 			q++;
-		if (q >= end)
+		if (q >= end || *q++ != '?')
 			continue;
-		if (*q++ != '?')
-			continue;
-		if (q >= end)
-			continue;
-		if (*q != '=')
+		if (q >= end || *q != '=')
 			continue;
 		if (q + 1 - (p - 1) > 75)
 			continue;
