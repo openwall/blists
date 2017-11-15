@@ -741,10 +741,11 @@ int mailbox_parse(char *mailbox)
 			logtty("Incompatible index (needs rebuild).\n");
 			error = 1;
 		}
-		/* if mbox is unmodified, exit w/o error */
+
 		if (!error) {
 			struct stat st;
 
+			/* if mbox is unmodified, exit w/o error */
 			if (!fstat(fd, &st) && inc_ofs == st.st_size) {
 				logtty("Mbox is unmodified (%lu).\n", inc_ofs);
 				unlock_fd(idx_fd);
@@ -754,15 +755,14 @@ int mailbox_parse(char *mailbox)
 				free(idx);
 				return 0;
 			}
-		}
-		if (!error) {
+
 			logtty("Resuming index file\n");
 			inc_ofs = begin_inc_idx(idx_fd, fd);
 			error = inc_ofs < 0;
 		}
-		if (unlock_fd(idx_fd) && !error)
-			error = 1;
+		error |= unlock_fd(idx_fd);
 	}
+
 	/* otherwise create new index */
 	if (!error && idx_fd < 0)
 		idx_fd = open(idx, O_CREAT | O_WRONLY, 0644);
@@ -785,12 +785,10 @@ int mailbox_parse(char *mailbox)
 		logtty("Parsing mailbox from %lu...\n", inc_ofs);
 		error = mailbox_parse_fd(fd);
 		inc_ofs = lseek(fd, 0, SEEK_CUR);
-		if (unlock_fd(fd) && !error)
-			error = 1;
+		error |= unlock_fd(fd);
 	}
 
-	if (close(fd) && !error)
-		error = 1;
+	error |= close(fd);
 
 	/* update index map and rebuild thread links */
 	if (!error) {
@@ -838,10 +836,8 @@ int mailbox_parse(char *mailbox)
 	}
 
 	if (idx_fd >= 0) {
-		if (unlock_fd(idx_fd) && !error)
-			error = 1;
-		if (close(idx_fd) && !error)
-			error = 1;
+		error |= unlock_fd(idx_fd);
+		error |= close(idx_fd);
 	}
 
 	return error;
