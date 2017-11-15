@@ -108,16 +108,12 @@ int unlock_fd(int fd)
 	memset(&l, 0, sizeof(l));
 	l.l_whence = SEEK_SET;
 	l.l_type = F_UNLCK;
-	if (fcntl(fd, F_SETLK, &l))
-		return -1;
+	return fcntl(fd, F_SETLK, &l);
 #endif
 
 #if LOCK_FLOCK
-	if (flock(fd, LOCK_UN))
-		return -1;
+	return flock(fd, LOCK_UN);
 #endif
-
-	return 0;
 }
 
 /* read 'count' bytes resuming incomplete reads */
