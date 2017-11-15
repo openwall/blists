@@ -25,14 +25,14 @@ extern int unlock_fd(int fd);
  * Attempts to read until EOF, and returns the number of bytes read.
  * We don't expect any signals, so even EINTR is considered an error.
  */
-extern int read_loop(int fd, void *buffer, int count);
+extern ssize_t read_loop(int fd, void *buffer, size_t count);
 
 /*
  * Attempts to write all the supplied data.  Returns the number of bytes
  * written.  Any value that differs from the requested count means that
  * an error has occurred; if the value is -1, errno is set appropriately.
  */
-extern int write_loop(int fd, const void *buffer, int count);
+extern ssize_t write_loop(int fd, const void *buffer, size_t count);
 
 /*
  * Concatenates a variable number of strings.  The argument list must be

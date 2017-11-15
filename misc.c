@@ -117,13 +117,13 @@ int unlock_fd(int fd)
 }
 
 /* read 'count' bytes resuming incomplete reads */
-/* returns how much bytes is read or error (negative value) */
-int read_loop(int fd, void *buffer, int count)
+/* returns how many bytes are read or a negative value on error */
+ssize_t read_loop(int fd, void *buffer, size_t count)
 {
-	int offset, block;
+	ssize_t offset, block;
 
 	offset = 0;
-	while (count > 0) {
+	while (count > 0 && count <= SSIZE_MAX) {
 		block = read(fd, (char *)buffer + offset, count);
 
 		if (block < 0)
@@ -139,12 +139,12 @@ int read_loop(int fd, void *buffer, int count)
 }
 
 /* write 'count' bytes resuming incomplete writes */
-int write_loop(int fd, const void *buffer, int count)
+ssize_t write_loop(int fd, const void *buffer, size_t count)
 {
-	int offset, block;
+	ssize_t offset, block;
 
 	offset = 0;
-	while (count > 0) {
+	while (count > 0 && count <= SSIZE_MAX) {
 		block = write(fd, (char *)buffer + offset, count);
 
 /* If any write(2) fails, we consider that the entire write_loop() has
@@ -160,7 +160,7 @@ int write_loop(int fd, const void *buffer, int count)
 		count -= block;
 	}
 
-/* Should be equal to the requested size, unless our kernel got crazy. */
+/* Should be equal to the requested size, unless our kernel got crazy */
 	return offset;
 }
 
