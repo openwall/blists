@@ -45,7 +45,7 @@ static idx_msgnum_t num_by_aday[N_ADAY + 1];
 static idx_msgnum_t msg_num;	/* number of actual messages in msgs[] */
 static idx_msgnum_t msg_alloc;	/* (pre)allocated size of msgs[] (in messages) */
 static struct idx_message *msgs; /* flat array */
-static char *list;
+static const char *list;
 
 struct mem_message {
 	struct idx_message *msg;
@@ -60,7 +60,7 @@ struct parsed_message {
 	struct tm tm;
 	idx_hash_t msgid_hash, irt_hash;
 	int have_msgid, have_irt;
-	char *from, *subject;
+	const char *from, *subject;
 };
 
 /* allocate new message in msgs[] */
@@ -534,7 +534,7 @@ static int mailbox_parse_fd(int fd)
 			}
 			msg.tm.tm_year = 0;
 			if (line[length - 1] == '\n') {
-				char *p = memchr(line + 5, ' ', length - 5);
+				const char *p = memchr(line + 5, ' ', length - 5);
 				if (p) {
 					p = strptime(p, " %a %b %d %T %Y", &msg.tm);
 					if (!p || *p != '\n')
@@ -594,7 +594,7 @@ static int mailbox_parse_fd(int fd)
 			case 'i':
 				if (eq(p, l, "Message-ID:", 11) ||
 				    eq(p, l, "In-Reply-To:", 12)) {
-					char *q;
+					const char *q;
 					p = mime_decode_header(&mime);
 					while (*p && *p != '<')
 						p++;
@@ -663,7 +663,7 @@ static int mailbox_parse_fd(int fd)
 						p++;
 					msg.subject = p;
 					while ((p = strchr(p, '['))) {
-						char *q;
+						const char *q;
 						if (strncasecmp(++p, list, strlen(list)))
 							continue;
 						q = p + strlen(list);
@@ -704,10 +704,11 @@ static int mailbox_parse_fd(int fd)
 	return !done;
 }
 
-int mailbox_parse(char *mailbox)
+int mailbox_parse(const char *mailbox)
 {
+	const char *p;
 	int fd, idx_fd;
-	char *idx, *p;
+	char *idx;
 	off_t idx_size;
 	size_t msgs_size;
 	int error;

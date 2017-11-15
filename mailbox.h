@@ -17,6 +17,6 @@
 /*
  * Opens, parses, and closes the mailbox.  Returns a non-zero value on error.
  */
-extern int mailbox_parse(char *mailbox);
+extern int mailbox_parse(const char *mailbox);
 
 #endif
