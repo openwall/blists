@@ -87,13 +87,11 @@ char *mime_skip_header(struct mime_ctx *ctx)
 
 	p = ctx->src->ptr;
 	end = ctx->src->end;
-	if (p >= end)
-		/* end of message */
+	if (p >= end) /* end of message */
 		return NULL;
 
 	q = memchr(p, '\n', end - p);
-	if (q == p) {
-		/* end of headers */
+	if (q == p) { /* end of headers */
 		ctx->src->ptr = ++p;
 		return NULL;
 	}
@@ -127,7 +125,8 @@ static void process_header(struct mime_ctx *ctx, char *header)
 
 	if (!strncasecmp(header, "Content-Transfer-Encoding:", 26)) {
 		p = header + 26;
-		while (*p == ' ' || *p == '\t' || *p == '\n') p++;
+		while (*p == ' ' || *p == '\t' || *p == '\n')
+			p++;
 		ctx->entities->encoding = p;
 		return;
 	}
@@ -144,10 +143,13 @@ static void process_header(struct mime_ctx *ctx, char *header)
 		entity->boundary = NULL;
 
 		p = header + 13;
-		while (*p == ' ' || *p == '\t' || *p == '\n') p++;
+		while (*p == ' ' || *p == '\t' || *p == '\n')
+			p++;
 		entity->type = p;
-		while (*p && *p != ';') p++;
-		if (!*p) return;
+		while (*p && *p != ';')
+			p++;
+		if (!*p)
+			return;
 		*p++ = '\0';
 		if (!strncasecmp(entity->type, "multipart/", 10))
 			multipart++;
@@ -155,10 +157,13 @@ static void process_header(struct mime_ctx *ctx, char *header)
 		char *disposition;
 
 		p = header + 20;
-		while (*p == ' ' || *p == '\t' || *p == '\n') p++;
+		while (*p == ' ' || *p == '\t' || *p == '\n')
+			p++;
 		disposition = p;
-		while (*p && *p != ';') p++;
-		if (!*p) return;
+		while (*p && *p != ';')
+			p++;
+		if (!*p)
+			return;
 		*p++ = '\0';
 		if (!strcasecmp(disposition, "inline"))
 			entity->disposition = CONTENT_INLINE;
@@ -167,20 +172,27 @@ static void process_header(struct mime_ctx *ctx, char *header)
 	}
 
 	do {
-		while (*p == ' ' || *p == '\t' || *p == '\n') p++;
+		while (*p == ' ' || *p == '\t' || *p == '\n')
+			p++;
 		a = p;
-		while (*p && *p != '=') p++;
-		if (!*p) return;
+		while (*p && *p != '=')
+			p++;
+		if (!*p)
+			return;
 		*p++ = '\0';
 		if (*p == '"') {
 			v = ++p;
-			while (*p && *p != '"') p++;
-			if (!*p) return;
+			while (*p && *p != '"')
+				p++;
+			if (!*p)
+				return;
 			*p++ = '\0';
 		} else
 			v = p;
-		while (*p && *p != ';') p++;
-		if (*p) *p++ = '\0';
+		while (*p && *p != ';')
+			p++;
+		if (*p)
+			*p++ = '\0';
 		if (type == CONTENT_TYPE) {
 			if (multipart && !strcasecmp(a, "boundary"))
 				entity->boundary = v;
@@ -213,27 +225,28 @@ static void decode_qp(struct buffer *dst, const char *encoded, size_t length,
 
 	while (p < end) {
 		c = *p++;
-		if (c == '_' && header)
+		if (c == '_' && header) {
 			c = 0x20; /* "hexadecimal 20" as per RFC 2047 */
-		else if (c == '=' && p < end) {
+		} else if (c == '=' && p < end) {
 			c = *p++;
-			if (c == '\n') continue;
-			if (c >= '0' && c <= '9' && p < end)
+			if (c == '\n')
+				continue;
+			if (c >= '0' && c <= '9' && p < end) {
 				v = c - '0';
-			else if (c >= 'A' && c <= 'F' && p < end)
+			} else if (c >= 'A' && c <= 'F' && p < end) {
 				v = c - ('A' - 10);
-			else {
+			} else {
 				buffer_appendc(dst, '=');
 				p--;
 				continue;
 			}
 			v <<= 4;
 			c = *p++;
-			if (c >= '0' && c <= '9')
+			if (c >= '0' && c <= '9') {
 				v |= c - '0';
-			else if (c >= 'A' && c <= 'F')
+			} else if (c >= 'A' && c <= 'F') {
 				v |= c - ('A' - 10);
-			else {
+			} else {
 				buffer_appendc(dst, '=');
 				p -= 2;
 				continue;
@@ -255,9 +268,11 @@ static void decode_base64(struct buffer *dst, const char *encoded, size_t length
 
 	while (p < end) {
 		c = *p++;
-		if (c == '\n') continue;
+		if (c == '\n')
+			continue;
 
-		if (end - p < 3) return;
+		if (end - p < 3)
+			return;
 		i = 0;
 		v = 0;
 		do {
@@ -275,7 +290,8 @@ static void decode_base64(struct buffer *dst, const char *encoded, size_t length
 				break;
 			else
 				return;
-			if (++i >= 4) break;
+			if (++i >= 4)
+				break;
 			v <<= 6;
 			c = *p++;
 		} while (1);
@@ -302,23 +318,23 @@ static inline int istokenchar(char ch)
 {
 	/* rfc2047#section-2 token */
 	switch (ch) {
-		/* SPACE */
-		case ' ':
-		/* CTLs */
-		case '\0' ... '\037':
-		case '\177':
-		/* especials */
-		case '(':
-		case ')':
-		case ',':
-		case '.':
-		case '/':
-		case ':' ... '@': /* :;<=>?@ */
-		case '[':
-		case ']':
-			return 0;
-		default:
-			return 1;
+	/* SPACE */
+	case ' ':
+	/* CTLs */
+	case '\0' ... '\037':
+	case '\177':
+	/* especials */
+	case '(':
+	case ')':
+	case ',':
+	case '.':
+	case '/':
+	case ':' ... '@': /* :;<=>?@ */
+	case '[':
+	case ']':
+		return 0;
+	default:
+		return 1;
 	}
 }
 
@@ -334,13 +350,13 @@ static inline int isencodedchar(unsigned char ch)
 static inline int islinearwhitespace(char ch)
 {
 	switch (ch) {
-		case ' ':
-		case '\t':
-		case '\r':
-		case '\n':
-			return 1;
-		default:
-			return 0;
+	case ' ':
+	case '\t':
+	case '\r':
+	case '\n':
+		return 1;
+	default:
+		return 0;
 	}
 }
 
@@ -357,32 +373,49 @@ static int decode_header(struct mime_ctx *ctx, const char *header, size_t length
 	while (p < end) {
 		const char *r;
 
-		if (*p++ != '=') continue;
-		if (p >= end) break;
-		if (*p != '?') continue;
+		if (*p++ != '=')
+			continue;
+		if (p >= end)
+			break;
+		if (*p != '?')
+			continue;
 		q = p;
 		charset = ++q;
-		if (q >= end) continue;
-		if (!istokenchar(*q++)) continue;
+		if (q >= end)
+			continue;
+		if (!istokenchar(*q++))
+			continue;
 		while (q < end && istokenchar(*q))
 			q++;
-		if (q >= end) continue;
-		if (*q++ != '?') continue;
-		if (q >= end) continue;
+		if (q >= end)
+			continue;
+		if (*q++ != '?')
+			continue;
+		if (q >= end)
+			continue;
 		if (*q != 'q' && *q != 'Q' && *q != 'B' && *q != 'b')
 			continue;
 		encoding = q++;
-		if (q >= end) continue;
-		if (*q++ != '?') continue;
-		if (q >= end) continue;
-		if (!isencodedchar(*q++)) continue;
+		if (q >= end)
+			continue;
+		if (*q++ != '?')
+			continue;
+		if (q >= end)
+			continue;
+		if (!isencodedchar(*q++))
+			continue;
 		while (q < end && isencodedchar(*q))
 			q++;
-		if (q >= end) continue;
-		if (*q++ != '?') continue;
-		if (q >= end) continue;
-		if (*q != '=') continue;
-		if (q + 1 - (p - 1) > 75) continue;
+		if (q >= end)
+			continue;
+		if (*q++ != '?')
+			continue;
+		if (q >= end)
+			continue;
+		if (*q != '=')
+			continue;
+		if (q + 1 - (p - 1) > 75)
+			continue;
 		/* skip adjacent linear-white-space between previous
 		 * encoded-word */
 		r = --p;
@@ -481,18 +514,22 @@ static char *find_next_boundary(struct mime_ctx *ctx, int pre)
 					free_entities_to(ctx, entity->next);
 					if (pre)
 						return ctx->src->ptr = p - 2;
-					if (ctx->entities) break;
+					if (ctx->entities)
+						break;
 					return end;
 				}
 				free_entities_to(ctx, entity);
-				if (!pre && new_entity(ctx)) return NULL;
+				if (!pre && new_entity(ctx))
+					return NULL;
 				p -= 2;
-				if (pre && p > ctx->src->ptr) p--;
+				if (pre && p > ctx->src->ptr)
+					p--;
 				return ctx->src->ptr = p;
 			} while ((entity = entity->next));
 		}
 		p = memchr(p, '\n', end - p);
-		if (!p) break;
+		if (!p)
+			break;
 		p++;
 	} while (1);
 
@@ -510,15 +547,15 @@ char *mime_next_body_part(struct mime_ctx *ctx)
 char *mime_next_body(struct mime_ctx *ctx)
 {
 	while (ctx->src->ptr < ctx->src->end) {
-		switch (*ctx->src->ptr) {
-		case 'C':
-		case 'c':
-			mime_decode_header(ctx);
-			continue;
-		case '\n':
-			return ++ctx->src->ptr;
-		}
-		mime_skip_header(ctx);
+	switch (*ctx->src->ptr) {
+	case 'C':
+	case 'c':
+		mime_decode_header(ctx);
+		continue;
+	case '\n':
+		return ++ctx->src->ptr;
+	}
+	mime_skip_header(ctx);
 	}
 
 	return ctx->src->ptr;
