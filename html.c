@@ -1097,7 +1097,7 @@ int html_month_index(const char *list, unsigned int y, unsigned int m)
 		if (!total || !msg) {
 			buffer_free(&dst);
 			free(msgp);
-			return html_error("No messages for this month.");
+			return html_error("No messages for this month");
 		}
 
 		html_output_month_cal(&dst, mn, y, m, L_DAILY);
@@ -1163,7 +1163,7 @@ int html_year_index(const char *list, unsigned int y)
 {
 	unsigned int min_y, max_y, m, d, aday, rday;
 	int fd;
-	idx_msgnum_t *mn, count, monthly_total, total;
+	idx_msgnum_t *mn, count;
 	size_t mn_size;
 	struct buffer dst;
 
@@ -1295,7 +1295,7 @@ int html_year_index(const char *list, unsigned int y)
 			buffer_appendf(&dst, " - %u", y);
 		buffer_appends(&dst, "</h2>\n");
 
-		total = 0;
+		idx_msgnum_t total = 0, monthly_total[12];
 		/* output short year-o-month index */
 		int o_header = 0;
 		int o_year = 0;
@@ -1303,7 +1303,7 @@ int html_year_index(const char *list, unsigned int y)
 		for (y = max_y; y >= min_y; y--) {
 			rday = YMD2ADAY(y - MIN_YEAR, 1, 1) - aday;
 			for (m = 1; m <= 12; m++) {
-				monthly_total = 0;
+				monthly_total[m - 1] = 0;
 				for (d = 1; d <= 31; d++, rday++) {
 					if (mn[rday] <= 0)
 						continue;
@@ -1311,9 +1311,9 @@ int html_year_index(const char *list, unsigned int y)
 						count = mn[rday + 1] - mn[rday];
 					else
 						count = -mn[rday + 1];
-					monthly_total += count;
+					monthly_total[m - 1] += count;
 				}
-				if (!monthly_total)
+				if (!monthly_total[m - 1])
 					continue;
 				if (!o_header) {
 					buffer_appends(&dst,
@@ -1344,9 +1344,9 @@ int html_year_index(const char *list, unsigned int y)
 				buffer_appendf(&dst, "<td><a href=\"");
 				if (min_y != max_y)
 					buffer_appendf(&dst, "%u/", y);
-				buffer_appendf(&dst, "%02u/\">%u</a>", m, monthly_total);
+				buffer_appendf(&dst, "%02u/\">%u</a>", m, monthly_total[m - 1]);
 				o_month = m;
-				total += monthly_total;
+				total += monthly_total[m - 1];
 			}
 		}
 		if (o_header) {
@@ -1382,8 +1382,13 @@ int html_year_index(const char *list, unsigned int y)
 				if (m % 3 == 1) {
 					unsigned int n;
 					buffer_appends(&dst, "\n<tr>");
-					for (n = m; n < m + 3; n++)
-						buffer_appendf(&dst, "<th><a href=\"%02u/\">%s</a>", n, month_name[n - 1]);
+					for (n = m; n < m + 3; n++) {
+						if (monthly_total[n - 1])
+							buffer_appendf(&dst, "<th><a href=\"%02u/\">%s</a>",
+							    n, month_name[n - 1]);
+						else
+							buffer_appendf(&dst, "<th>%s", month_name[n - 1]);
+					}
 					buffer_appends(&dst, "\n<tr>");
 				}
 
