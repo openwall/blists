@@ -1,9 +1,9 @@
 /*
  * Initial mbox file parsing.
  *
- * Copyright (c) 2006,2008,2010,2011 Solar Designer <solar at openwall.com>
+ * Copyright (c) 1998-2003,2006,2008,2010,2011,2015 Solar Designer <solar at openwall.com>
  * Copyright (c) 2008 Grigoriy Strokin <grg at openwall.com>
- * Copyright (c) 2011 ABC <abc at openwall.com>
+ * Copyright (c) 2011,2017 ABC <abc at openwall.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted.
