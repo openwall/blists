@@ -728,7 +728,9 @@ int html_attachment(const char *list, unsigned int y, unsigned int m, unsigned i
 	if (*src.ptr == '\n')
 		body = ++src.ptr;
 
+	const char *error_msg = "Attachment not found";
 	unsigned int attachment_count = 0;
+	if (a)
 	do {
 		if (mime.entities->boundary) {
 			body = mime_next_body_part(&mime);
@@ -736,57 +738,49 @@ int html_attachment(const char *list, unsigned int y, unsigned int m, unsigned i
 				break;
 			body = mime_next_body(&mime);
 		}
-		if (mime.entities->boundary || !is_attachment(&mime) || ++attachment_count != a) {
+		if (mime.entities->boundary || !is_attachment(&mime) || ++attachment_count != a)
 			body = NULL;
-		} else {
-			int text = !strncasecmp(mime.entities->type, "text/", 5);
-			if (text) {
-				buffer_appends(&dst, "Content-Type: text/plain");
-				if (mime.entities->charset && enc_allowed_charset(mime.entities->charset))
-					buffer_appendf(&dst, "; charset=%s", mime.entities->charset);
-				buffer_appendc(&dst, '\n');
-			} else {
-				buffer_appends(&dst, "Content-Type: application/octet-stream\n");
-			}
-			buffer_appendf(&dst, "Content-Disposition: %s; filename=\"", text ? "inline" : "attachment");
-			buffer_append_filename(&dst, mime.entities->filename, text);
-			buffer_appends(&dst, "\"\n");
-		}
-		if (body) {
-			body = mime_decode_body(&mime, RECODE_NO, &bend);
-			if (bend >= src.end) {
-				dst.ptr = dst.start;
-				buffer_appendf(&dst, "Status: 404 Not Found\n\nAttachment is truncated.\n");
-				break;
-			}
-			if (!body)
-				break;
-			bend = src.ptr;
-		} else {
+		if (!body) {
 			bend = mime_skip_body(&mime);
 			if (!bend)
 				break;
 			continue;
 		}
 
+		int text = !strncasecmp(mime.entities->type, "text/", 5);
+		if (text) {
+			buffer_appends(&dst, "Content-Type: text/plain");
+			if (mime.entities->charset && enc_allowed_charset(mime.entities->charset))
+				buffer_appendf(&dst, "; charset=%s", mime.entities->charset);
+			buffer_appendc(&dst, '\n');
+		} else {
+			buffer_appends(&dst, "Content-Type: application/octet-stream\n");
+		}
+		buffer_appendf(&dst, "Content-Disposition: %s; filename=\"", text ? "inline" : "attachment");
+		buffer_append_filename(&dst, mime.entities->filename, text);
+		buffer_appends(&dst, "\"\n");
+
+		body = mime_decode_body(&mime, RECODE_NO, &bend);
+		if (!body || bend >= src.end) {
+			error_msg = "Attachment is truncated";
+			break;
+		}
+
 		buffer_appendf(&dst, "Content-Length: %llu\n\n", (unsigned long long)(mime.dst.ptr - body));
 		buffer_append(&dst, body, mime.dst.ptr - body);
-
-		mime.dst.ptr = body;
+		error_msg = NULL;
+		break;
 	} while (bend < src.end && mime.entities);
 
 	buffer_free(&src);
 
-	if (mime.dst.error || dst.error) {
+	if (error_msg || mime.dst.error || dst.error) {
 		mime_free(&mime);
 		buffer_free(&dst);
-		return html_error(NULL);
+		return html_error(error_msg);
 	}
 
 	mime_free(&mime);
-
-	if (dst.ptr == dst.start)
-		html_error("Attachment not found");
 
 	return html_send(&dst);
 }
