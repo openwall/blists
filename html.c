@@ -964,7 +964,7 @@ static void html_output_month_cal(struct buffer *pdst, idx_msgnum_t *mn, unsigne
 			buffer_appends(pdst, "\n<tr>");
 		if (d == 1 && col > 0)
 			buffer_appendf(pdst, "<td colspan=\"%u\">", col);
-		buffer_appendf(pdst, "<td><sup><b>%u</b></sup>", d);
+		buffer_appendf(pdst, "<td><sup>%u</sup>&nbsp;", d);
 		if (mn[d]) {
 			if (mp > 0) {
 				if (mn[d] > 0)
