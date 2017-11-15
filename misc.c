@@ -2,12 +2,8 @@
  * Miscellaneous system and library call wrappers.
  * See misc.h for the descriptions.
  *
- * Written by Solar Designer <solar at openwall.com> in 1998-2008.
- * No copyright is claimed, and the software is hereby placed in the public
- * domain.  In case this attempt to disclaim copyright and place the software
- * in the public domain is deemed null and void, then the software is
- * Copyright (c) 1998-2008 Solar Designer and it is hereby released to the
- * general public under the following terms:
+ * Copyright (c) 1998-2008,2017 Solar Designer <solar at openwall.com>
+ * Copyright (c) 2017 ABC <abc at openwall.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted.
