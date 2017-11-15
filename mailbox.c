@@ -100,7 +100,8 @@ static int message_process(struct parsed_message *msg)
 	size_t left;
 
 	idx_msg = msgs_grow();
-	if (!idx_msg) return -1;
+	if (!idx_msg)
+		return -1;
 
 	memset(idx_msg, 0, sizeof(*idx_msg));
 
@@ -180,7 +181,8 @@ static int msgs_link(void)
 	unsigned int count;
 
 	pool = calloc(msg_num, sizeof(*pool));
-	if (!pool) return -1;
+	if (!pool)
+		return -1;
 	hash = calloc(0x10000, sizeof(*hash));
 	if (!hash) {
 		free(pool);
@@ -191,7 +193,8 @@ static int msgs_link(void)
 		/* The following assignment eliminates link cycles that may
 		 * cause an infinite loop in incremental mode. */
 		m->t.nn = m->t.pn = 0;
-		if (!(m->flags & IDX_F_HAVE_MSGID)) continue;
+		if (!(m->flags & IDX_F_HAVE_MSGID))
+			continue;
 		pool[i].msg = m;
 		hv = m->msgid_hash[0] | ((unsigned int)m->msgid_hash[1] << 8);
 		pool[i].next_hash = hash[hv];
@@ -199,12 +202,12 @@ static int msgs_link(void)
 	}
 
 	for (i = 0, m = msgs; i < msg_num; i++, m++) {
-		if (!(m->flags & IDX_F_HAVE_IRT)) continue;
+		if (!(m->flags & IDX_F_HAVE_IRT))
+			continue;
 		hv = m->irt_hash[0] | ((unsigned int)m->irt_hash[1] << 8);
 		irt = hash[hv];
 		while (irt) {
-			if (!memcmp(m->irt_hash, irt->msg->msgid_hash,
-			    sizeof(idx_hash_t)) && m != irt->msg)
+			if (!memcmp(m->irt_hash, irt->msg->msgid_hash, sizeof(idx_hash_t)) && m != irt->msg)
 				break;
 			irt = irt->next_hash;
 		}
@@ -218,11 +221,14 @@ static int msgs_link(void)
 		while (lit->t.nn) {
 			aday = YMD2ADAY(lit->t.ny, lit->t.nm, lit->t.nd);
 			lit = &msgs[num_by_aday[aday] + lit->t.nn - 2];
-			if (lit == seen) break;
-			if (!((count + 1) & count)) seen = lit;
+			if (lit == seen)
+				break;
+			if (!((count + 1) & count))
+				seen = lit;
 			count++;
 		}
-		if (lit->t.nn) continue;
+		if (lit->t.nn)
+			continue;
 		aday = YMD2ADAY(lit->y, lit->m, lit->d);
 		m->t.py = lit->y;
 		m->t.pm = lit->m;
@@ -245,8 +251,10 @@ static int cmp_msgs_by_day(const void *p1, const void *p2)
 {
 	const struct idx_message *m1 = p1, *m2 = p2;
 
-	if (m1->y != m2->y) return (int)m1->y - (int)m2->y;
-	if (m1->m != m2->m) return (int)m1->m - (int)m2->m;
+	if (m1->y != m2->y)
+		return (int)m1->y - (int)m2->y;
+	if (m1->m != m2->m)
+		return (int)m1->m - (int)m2->m;
 	return (int)m1->d - (int)m2->d;
 }
 
@@ -260,11 +268,13 @@ static int msgs_final(idx_msgnum_t start_from)
 retry:
 	prev_aday = 0;
 	if (start_from) {
-		for (i = 0; i < N_ADAY; i++)
+		for (i = 0; i < N_ADAY; i++) {
 			if (num_by_aday[i] > 0)
 				prev_aday = i;
-	} else
+		}
+	} else {
 		memset(num_by_aday, 0, sizeof(num_by_aday));
+	}
 
 	for (i = start_from, m = msgs + start_from; i < msg_num; i++, m++) {
 		aday = YMD2ADAY(m->y, m->m, m->d);
@@ -293,13 +303,12 @@ retry:
  * Checks if the buffer pointed to by s1, of n1 chars, starts with the
  * string s2, of n2 chars.
  */
-#ifdef __GNUC__
-__inline__
-#endif
-static int eq(const char *s1, size_t n1, const char *s2, size_t n2)
+static inline int eq(const char *s1, size_t n1, const char *s2, size_t n2)
 {
-	if (n1 < n2) return 0;
-	if (!memcmp(s1, s2, n2)) return 1;
+	if (n1 < n2)
+		return 0;
+	if (!memcmp(s1, s2, n2))
+		return 1;
 	return !strncasecmp(s1, s2, n2);
 }
 
@@ -314,8 +323,7 @@ static off_t begin_inc_idx(int idx_fd, int fd)
 	int error = 0;
 
 	/* read messages-per-day array */
-	if (read_loop(idx_fd, &num_by_aday, sizeof(num_by_aday)) !=
-	    sizeof(num_by_aday))
+	if (read_loop(idx_fd, &num_by_aday, sizeof(num_by_aday)) != sizeof(num_by_aday))
 		return 0;
 
 	msg_num = 0;
@@ -383,20 +391,21 @@ static int mailbox_parse_fd(int fd)
 	off_t unindexed_size, inc_ofs;
 
 	inc_ofs = lseek(fd, 0, SEEK_CUR);
-	if (inc_ofs < 0) return 1;
-	if (fstat(fd, &stat)) return 1;
+	if (inc_ofs < 0 || fstat(fd, &stat))
+		return 1;
 	unindexed_size = stat.st_size - inc_ofs;
-	if (!unindexed_size) return 0;
-	if (unindexed_size < 0) return 1;
-	if (!S_ISREG(stat.st_mode)) return 1;
-	if (stat.st_size > MAX_MAILBOX_BYTES ||
-	    (stat.st_size >> (sizeof(off_t) * 8 - 1)))
+	if (!unindexed_size)
+		return 0;
+	if (unindexed_size < 0 || !S_ISREG(stat.st_mode))
+		return 1;
+	if (stat.st_size > MAX_MAILBOX_BYTES || (stat.st_size >> (sizeof(off_t) * 8 - 1)))
 		return 1;
 
 	memset(&msg, 0, sizeof(msg));
 
 	file_buffer = malloc(FILE_BUFFER_SIZE + LINE_BUFFER_SIZE);
-	if (!file_buffer) return 1;
+	if (!file_buffer)
+		return 1;
 	line_buffer = &file_buffer[FILE_BUFFER_SIZE];
 
 	if (buffer_init(&premime, 0)) {
@@ -437,7 +446,8 @@ static int mailbox_parse_fd(int fd)
 			if (saved) {
 /* Have this line's beginning in the line buffer: combine them */
 				extra = LINE_BUFFER_SIZE - saved;
-				if (extra > length) extra = length;
+				if (extra > length)
+					extra = length;
 				memcpy(&line_buffer[saved], current, extra);
 				current += extra; block -= extra;
 				length = saved + extra;
@@ -458,8 +468,10 @@ static int mailbox_parse_fd(int fd)
 /* Have this line's beginning in the line buffer: combine them */
 /* Not enough data to process right now: buffer it */
 				extra = LINE_BUFFER_SIZE - saved;
-				if (extra > block) extra = block;
-				if (!saved) line_offset = file_offset - block;
+				if (extra > block)
+					extra = block;
+				if (!saved)
+					line_offset = file_offset - block;
 				memcpy(&line_buffer[saved], current, extra);
 				current += extra; block -= extra;
 				saved += extra;
@@ -478,7 +490,8 @@ static int mailbox_parse_fd(int fd)
 /* We've emptied the file buffer: fetch some more data */
 				current = file_buffer;
 				block = read(fd, file_buffer, FILE_BUFFER_SIZE);
-				if (block < 0) break;
+				if (block < 0)
+					break;
 				file_offset += block;
 				if (block > 0 && saved < LINE_BUFFER_SIZE)
 					continue;
@@ -512,18 +525,19 @@ static int mailbox_parse_fd(int fd)
 /* Process the previous one first, if exists */
 			if (offset > inc_ofs) {
 /* If we aren't at the very beginning, there must have been a message */
-				if (!msg.data_offset) break;
+				if (!msg.data_offset)
+					break;
 				msg.raw_size = offset - msg.raw_offset;
 				msg.data_size = offset - body - msg.data_offset;
 				log_percentage(offset, stat.st_size);
-				if (message_process(&msg)) break;
+				if (message_process(&msg))
+					break;
 			}
 			msg.tm.tm_year = 0;
 			if (line[length - 1] == '\n') {
 				char *p = memchr(line + 5, ' ', length - 5);
 				if (p) {
-					p = strptime(p, " %a %b %d %T %Y",
-					    &msg.tm);
+					p = strptime(p, " %a %b %d %T %Y", &msg.tm);
 					if (!p || *p != '\n')
 						msg.tm.tm_year = 0;
 				}
@@ -583,11 +597,15 @@ static int mailbox_parse_fd(int fd)
 				    eq(p, l, "In-Reply-To:", 12)) {
 					char *q;
 					p = mime_decode_header(&mime);
-					while (*p && *p != '<') p++;
-					if (!*p) continue;
+					while (*p && *p != '<')
+						p++;
+					if (!*p)
+						continue;
 					q = ++p;
-					while (*q && *q != '>') q++;
-					if (!*q || q - p < 4) continue;
+					while (*q && *q != '>')
+						q++;
+					if (!*q || q - p < 4)
+						continue;
 					MD5_Init(&hash);
 					MD5_Update(&hash, p, q - p);
 					if (m) {
@@ -606,16 +624,21 @@ static int mailbox_parse_fd(int fd)
 				    eq(p, l, "References:", 11)) {
 					char *q;
 					p = mime_decode_header(&mime);
-					while (*p && *p != '<') p++;
-					if (!*p) continue;
+					while (*p && *p != '<')
+						p++;
+					if (!*p)
+						continue;
 					/* seek last reference */
 					do {
 						q = ++p;
-						while (*p && *p != '<') p++;
+						while (*p && *p != '<')
+							p++;
 					} while (*p);
 					p = q;
-					while (*q && *q != '>') q++;
-					if (!*q || q - p < 4) continue;
+					while (*q && *q != '>')
+						q++;
+					if (!*q || q - p < 4)
+						continue;
 					MD5_Init(&hash);
 					MD5_Update(&hash, p, q - p);
 					MD5_Final(msg.irt_hash, &hash);
@@ -627,7 +650,8 @@ static int mailbox_parse_fd(int fd)
 			case 'f':
 				if (eq(p, l, "From:", 5)) {
 					p = mime_decode_header(&mime) + 5;
-					while (*p == ' ' || *p == '\t') p++;
+					while (*p == ' ' || *p == '\t')
+						p++;
 					msg.from = p;
 					continue;
 				}
@@ -636,16 +660,18 @@ static int mailbox_parse_fd(int fd)
 			case 's':
 				if (eq(p, l, "Subject:", 8)) {
 					p = mime_decode_header(&mime) + 8;
-					while (*p == ' ' || *p == '\t') p++;
+					while (*p == ' ' || *p == '\t')
+						p++;
 					msg.subject = p;
 					while ((p = strchr(p, '['))) {
 						char *q;
-						if (strncasecmp(++p, list,
-						    strlen(list)))
+						if (strncasecmp(++p, list, strlen(list)))
 							continue;
 						q = p + strlen(list);
-						if (*q != ']') continue;
-						if (*++q == ' ') q++;
+						if (*q != ']')
+							continue;
+						if (*++q == ' ')
+							q++;
 						memmove(--p, q, strlen(q) + 1);
 					}
 					continue;
@@ -656,20 +682,24 @@ static int mailbox_parse_fd(int fd)
 		}
 	} while (1);
 
-	if (premime.error) done = 0;
+	if (premime.error)
+		done = 0;
 	buffer_free(&premime);
 	free(file_buffer);
 
-	if (offset != stat.st_size || !msg.data_offset) done = 0;
+	if (offset != stat.st_size || !msg.data_offset)
+		done = 0;
 
 	if (done) {
 /* Process the last message */
 		msg.raw_size = offset - msg.raw_offset;
 		msg.data_size = offset - (blank & body) - msg.data_offset;
-		if (message_process(&msg)) done = 0;
+		if (message_process(&msg))
+			done = 0;
 	}
 
-	if (mime.dst.error) done = 0;
+	if (mime.dst.error)
+		done = 0;
 	mime_free(&mime);
 
 	return !done;
@@ -691,7 +721,8 @@ int mailbox_parse(char *mailbox)
 		list = mailbox;
 
 	fd = open(mailbox, O_RDONLY);
-	if (fd < 0) return 1;
+	if (fd < 0)
+		return 1;
 
 	error = lock_fd(fd, 1);
 
@@ -714,10 +745,8 @@ int mailbox_parse(char *mailbox)
 		if (!error) {
 			struct stat st;
 
-			if (!fstat(fd, &st) &&
-			    inc_ofs == st.st_size) {
-				logtty("Mbox is unmodified (%lu).\n",
-				    inc_ofs);
+			if (!fstat(fd, &st) && inc_ofs == st.st_size) {
+				logtty("Mbox is unmodified (%lu).\n", inc_ofs);
 				unlock_fd(idx_fd);
 				close(idx_fd);
 				unlock_fd(fd);
@@ -731,7 +760,8 @@ int mailbox_parse(char *mailbox)
 			inc_ofs = begin_inc_idx(idx_fd, fd);
 			error = inc_ofs < 0;
 		}
-		if (unlock_fd(idx_fd) && !error) error = 1;
+		if (unlock_fd(idx_fd) && !error)
+			error = 1;
 	}
 	/* otherwise create new index */
 	if (!error && idx_fd < 0)
@@ -755,10 +785,12 @@ int mailbox_parse(char *mailbox)
 		logtty("Parsing mailbox from %lu...\n", inc_ofs);
 		error = mailbox_parse_fd(fd);
 		inc_ofs = lseek(fd, 0, SEEK_CUR);
-		if (unlock_fd(fd) && !error) error = 1;
+		if (unlock_fd(fd) && !error)
+			error = 1;
 	}
 
-	if (close(fd) && !error) error = 1;
+	if (close(fd) && !error)
+		error = 1;
 
 	/* update index map and rebuild thread links */
 	if (!error) {
@@ -783,9 +815,7 @@ int mailbox_parse(char *mailbox)
 	/* write messages-per-day array */
 	if (!error) {
 		logtty("Writing messages index...\n");
-		error =
-		    write_loop(idx_fd, num_by_aday, sizeof(num_by_aday))
-		    != sizeof(num_by_aday);
+		error = write_loop(idx_fd, num_by_aday, sizeof(num_by_aday)) != sizeof(num_by_aday);
 	}
 
 	/* write messages metadata */
@@ -808,8 +838,10 @@ int mailbox_parse(char *mailbox)
 	}
 
 	if (idx_fd >= 0) {
-		if (unlock_fd(idx_fd) && !error) error = 1;
-		if (close(idx_fd) && !error) error = 1;
+		if (unlock_fd(idx_fd) && !error)
+			error = 1;
+		if (close(idx_fd) && !error)
+			error = 1;
 	}
 
 	return error;
