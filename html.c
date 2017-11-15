@@ -785,6 +785,9 @@ int html_attachment(const char *list, unsigned int y, unsigned int m, unsigned i
 
 	mime_free(&mime);
 
+	if (dst.ptr == dst.start)
+		html_error("Attachment not found");
+
 	return html_send(&dst);
 }
 
