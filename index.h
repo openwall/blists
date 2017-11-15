@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2006,2011 Solar Designer <solar at openwall.com>
- * Copyright (c) 2011 ABC <abc at openwall.com>
+ * Copyright (c) 2011,2014 ABC <abc at openwall.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted.
@@ -60,12 +60,9 @@ struct idx_message {
 static inline int aday_count(const idx_msgnum_t *mn) {
 	if (mn[0] < 1)
 		return 0;
-	else {
-		if (mn[1] <= 0)
-			return -mn[1];
-		else
-			return mn[1] - mn[0];
-	}
+	if (mn[1] <= 0)
+		return -mn[1];
+	return mn[1] - mn[0];
 }
 
 extern int idx_check_header(int fd, off_t *offset_p);
