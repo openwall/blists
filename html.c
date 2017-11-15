@@ -712,10 +712,10 @@ int html_attachment(const char *list, unsigned int y, unsigned int m, unsigned i
 	body = NULL;
 	while (src.end - src.ptr > 9 && *src.ptr != '\n') {
 		switch (*src.ptr) {
-			case 'C':
-			case 'c':
-				mime_decode_header(&mime);
-				continue;
+		case 'C':
+		case 'c':
+			mime_decode_header(&mime);
+			continue;
 		}
 		mime_skip_header(&mime);
 	}
