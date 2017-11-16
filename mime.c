@@ -260,6 +260,13 @@ static void decode_qp(struct buffer *dst, const char *encoded, size_t length,
 /* from `encoded' to `dst' */
 static void decode_base64(struct buffer *dst, const char *encoded, size_t length)
 {
+	const unsigned char a2i[80] = {
+		62, 65, 65, 65, 63, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 65,
+		65, 65, 64, 65, 65, 65, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
+		10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
+		65, 65, 65, 65, 65, 65, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35,
+		36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51
+	};
 	unsigned char c, *p, *end;
 	unsigned int i, v;
 
@@ -276,20 +283,15 @@ static void decode_base64(struct buffer *dst, const char *encoded, size_t length
 		i = 0;
 		v = 0;
 		do {
-			if (c >= 'A' && c <= 'Z')
-				v |= c - 'A';
-			else if (c >= 'a' && c <= 'z')
-				v |= c - ('a' - 26);
-			else if (c >= '0' && c <= '9')
-				v |= c - ('0' - 52);
-			else if (c == '+')
-				v |= 62;
-			else if (c == '/')
-				v |= 63;
-			else if (c == '=')
-				break;
-			else
+			if ((c -= '+') >= sizeof(a2i))
 				return;
+			c = a2i[c];
+			if (c > 63) {
+				if (c == 64) /* '=' */
+					break;
+				return;
+			}
+			v |= c;
 			if (++i >= 4)
 				break;
 			v <<= 6;
