@@ -52,7 +52,7 @@ static int buffer_grow(struct buffer *buf, size_t length)
 
 	if (length <= buf->end - buf->ptr)
 		return 0;
-	if (length > BUFFER_GROW_MAX || !buf->start)
+	if (length > BUFFER_GROW_MAX || !buf->start || buf->error)
 		return buf->error = -1;
 
 	new_size = buf->ptr - buf->start + length + BUFFER_GROW_STEP;
