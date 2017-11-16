@@ -300,6 +300,14 @@ static void decode_base64(struct buffer *dst, const char *encoded, size_t length
 
 		switch (i) {
 		case 4:
+			if (dst->end - dst->ptr >= 3) {
+				char *p = dst->ptr;
+				p[0] = v >> 16;
+				p[1] = v >> 8;
+				p[2] = v;
+				dst->ptr = p + 3;
+				continue;
+			}
 			buffer_appendc(dst, v >> 16);
 			buffer_appendc(dst, v >> 8);
 			buffer_appendc(dst, v);
