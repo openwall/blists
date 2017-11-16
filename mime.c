@@ -217,7 +217,7 @@ static void process_header(struct mime_ctx *ctx, char *header)
 static void decode_qp(struct buffer *dst, const char *encoded, size_t length,
     int header)
 {
-	const unsigned char a2i[23] = {
+	static const unsigned char a2i[23] = {
 		0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
 		16, 16, 16, 16, 16, 16, 16,
 		10, 11, 12, 13, 14, 15
@@ -233,7 +233,7 @@ static void decode_qp(struct buffer *dst, const char *encoded, size_t length,
 		if (c == '=' && p < end) {
 			c = *p++ - '0';
 			if (c >= sizeof(a2i) || p >= end || (v = a2i[c]) > 15) {
-				if (c == '\n' - '0')
+				if (c == (unsigned char)('\n' - '0'))
 					continue;
 				buffer_appendc(dst, '=');
 				p--;
@@ -257,7 +257,7 @@ static void decode_qp(struct buffer *dst, const char *encoded, size_t length,
 /* from `encoded' to `dst' */
 static void decode_base64(struct buffer *dst, const char *encoded, size_t length)
 {
-	const unsigned char a2i[80] = {
+	static const unsigned char a2i[80] = {
 		62, 65, 65, 65, 63, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 65,
 		65, 65, 64, 65, 65, 65, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
 		10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
