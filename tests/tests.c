@@ -45,7 +45,7 @@ static void test_decode_header(char *istr, char *ostr)
 	buffer_append(&src, istr, ilen);
 	decode_header(&mime, src.start, ilen);
 
-	if (mime.dst.ptr - mime.dst.start != olen)
+	if (mime.dst.ptr - mime.dst.start != olen || memcmp(mime.dst.start, ostr, olen))
 		errx(1, "  decode_header: incorrect output (`%s' -> `%.*s' [%llu] vs `%s' [%llu])\n",
 		    istr,
 		    (int)(mime.dst.ptr - mime.dst.start), /* hack only suitable for tests */
