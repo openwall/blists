@@ -217,6 +217,11 @@ static void process_header(struct mime_ctx *ctx, char *header)
 static void decode_qp(struct buffer *dst, const char *encoded, size_t length,
     int header)
 {
+	const unsigned char a2i[23] = {
+		0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
+		16, 16, 16, 16, 16, 16, 16,
+		10, 11, 12, 13, 14, 15
+	};
 	unsigned char c, *p, *end;
 	unsigned int v;
 
@@ -225,33 +230,25 @@ static void decode_qp(struct buffer *dst, const char *encoded, size_t length,
 
 	while (p < end) {
 		c = *p++;
-		if (c == '_' && header) {
-			c = 0x20; /* "hexadecimal 20" as per RFC 2047 */
-		} else if (c == '=' && p < end) {
-			c = *p++;
-			if (c == '\n')
-				continue;
-			if (c >= '0' && c <= '9' && p < end) {
-				v = c - '0';
-			} else if (c >= 'A' && c <= 'F' && p < end) {
-				v = c - ('A' - 10);
-			} else {
+		if (c == '=' && p < end) {
+			c = *p++ - '0';
+			if (c >= sizeof(a2i) || p >= end || (v = a2i[c]) > 15) {
+				if (c == '\n' - '0')
+					continue;
 				buffer_appendc(dst, '=');
 				p--;
 				continue;
 			}
 			v <<= 4;
-			c = *p++;
-			if (c >= '0' && c <= '9') {
-				v |= c - '0';
-			} else if (c >= 'A' && c <= 'F') {
-				v |= c - ('A' - 10);
-			} else {
+			c = *p++ - '0';
+			if (c >= sizeof(a2i) || (c = a2i[c]) > 15) {
 				buffer_appendc(dst, '=');
 				p -= 2;
 				continue;
 			}
-			c = v;
+			c |= v;
+		} else if (header && c == '_') {
+			c = 0x20; /* "hexadecimal 20" as per RFC 2047 */
 		}
 		buffer_appendc(dst, c);
 	}
