@@ -2,6 +2,7 @@
  * Experimental unit-test for blists/mime.c.
  *
  * Copyright (c) 2017 ABC <abc at openwall.com>
+ * Copyright (c) 2017 Solar Designer <solar at openwall.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted.
@@ -101,9 +102,12 @@ static void test_encoded_words(void)
 	test_decode_header("(=?ISO-8859-1?Q?a?=  =?ISO-8859-1?Q?b?=)",	 "(ab)");
 	test_decode_header("(=?ISO-8859-1?Q?a?= \t =?ISO-8859-1?Q?b?=)", "(ab)");
 
-	test_decode_header(" (=?ISO-8859-1?Q?a?= =?ISO-8859-1?Q?b?=)",  " (ab)");
-	test_decode_header("x (=?ISO-8859-1?Q?a?= =?ISO-8859-1?Q?b?=)", "x (ab)");
-	test_decode_header("(=?ISO-8859-1?Q?a?= x =?ISO-8859-1?Q?b?=)", "(a x b)");
+	test_decode_header(" (=?ISO-8859-1?Q?a?= =?ISO-8859-1?Q?b?=)",	 " (ab)");
+	test_decode_header("x (=?ISO-8859-1?Q?a?= =?ISO-8859-1?Q?b?=)",	 "x (ab)");
+	test_decode_header("(=?ISO-8859-1?Q?a?= x =?ISO-8859-1?Q?b?=)",	 "(a x b)");
+
+	test_decode_header("(=?ISO-8859-1?Q?a_b?=)",			 "(a b)");
+	test_decode_header("(=?ISO-8859-1?Q?a?= =?ISO-8859-2?Q?_b?=)",	 "(a b)");
 
 	/* test improperly encoded mime-words */
 	test_decode_header_inv("=??utf-8?Q?test?=");	// duplicated '?'
