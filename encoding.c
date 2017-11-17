@@ -34,10 +34,10 @@ static const char *charset_whitelist[] = {
 	NULL
 };
 
-static int simple_tolower(char ch)
+static inline int simple_tolower(char ch)
 {
 	if (ch >= 'A' && ch <= 'Z')
-		return ch + 'a' - 'A';
+		return ch + ('a' - 'A');
 	return ch;
 }
 
