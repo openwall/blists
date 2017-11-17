@@ -30,6 +30,9 @@ static const char *charset_whitelist[] = {
 	"koi8-u$",
 	"windows-",
 	"cp",
+	"gb2312$",
+	"gbk$",
+	"gb18030$",
 	"utf-8", /* redundant in enc_to_utf8(), may be needed elsewhere */
 	NULL
 };
