@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006 Solar Designer <solar at openwall.com>
+ * Copyright (c) 2006,2017 Solar Designer <solar at openwall.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted.
@@ -19,7 +19,7 @@ int main(int argc, char **argv)
 	}
 
 	if (mailbox_parse(argv[1])) {
-		fprintf(stderr, "Failed to parse the mailbox: %s\n", argv[1]);
+		fprintf(stderr, "Failed to parse the mailbox or/and its index file: %s\n", argv[1]);
 		return 1;
 	}
 
