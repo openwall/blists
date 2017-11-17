@@ -246,14 +246,13 @@ static void decode_qp(struct buffer *dst, const char *encoded, size_t length,
 				p--;
 				continue;
 			}
-			v <<= 4;
 			c = *p++ - '0';
 			if (c >= sizeof(a2i) || (c = a2i[c]) > 15) {
 				buffer_appendc(dst, '=');
 				p -= 2;
 				continue;
 			}
-			c |= v;
+			c |= v << 4;
 		} else if (header && c == '_') {
 			c = 0x20; /* "hexadecimal 20" as per RFC 2047 */
 		}
