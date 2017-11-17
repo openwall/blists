@@ -187,7 +187,6 @@ static void buffer_append_html_generic(struct buffer *dst, const char *what, siz
 				buffer_append_html_generic(dst, url, url_length, 0, 0);
 				buffer_appends(dst, "</a>");
 				ptr = url + url_length;
-				break;
 			} else {
 				buffer_appendc(dst, c);
 			}
