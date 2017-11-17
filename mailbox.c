@@ -782,7 +782,7 @@ int mailbox_parse(const char *mailbox)
 
 	/* load messages into idx_message msgs[] */
 	if (!error) {
-		logtty("Parsing mailbox from %lu...\n", inc_ofs);
+		logtty("Parsing mailbox from %llu...\n", (unsigned long long)inc_ofs);
 		error = mailbox_parse_fd(fd);
 		inc_ofs = lseek(fd, 0, SEEK_CUR);
 		error |= unlock_fd(fd);
