@@ -214,8 +214,7 @@ static void process_header(struct mime_ctx *ctx, char *header)
 }
 
 /* from `encoded' to `dst' */
-static void decode_qp(struct buffer *dst, const char *encoded, size_t length,
-    int header)
+static inline void decode_qp(struct buffer *dst, const char *encoded, size_t length, int header)
 {
 /* RFC 2045: An "=" followed by two hexadecimal digits, one or both
  *           of which are lowercase letters in "abcdef", is formally
