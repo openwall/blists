@@ -188,8 +188,9 @@ static void buffer_append_html_generic(struct buffer *dst, const char *what, siz
 				buffer_appends(dst, "</a>");
 				ptr = url + url_length;
 				break;
-			} else
+			} else {
 				buffer_appendc(dst, c);
+			}
 			break;
 		case '@':
 			if (ptr - what >= 2 && end - ptr >= 4 &&
