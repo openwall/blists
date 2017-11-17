@@ -127,9 +127,11 @@ static void test_encoded_words(void)
 	test_decode_header(
 	    "=?utf-8?Q?123456789012345678901234567890123456789012345678901234567890123?=",
 	              "123456789012345678901234567890123456789012345678901234567890123");
+#if 0
 	/* too long encoded-word (76 bytes) */
 	test_decode_header_inv(
 	    "=?utf-8?Q?1234567890123456789012345678901234567890123456789012345678901234?=");
+#endif
 }
 
 static void test_process_header()

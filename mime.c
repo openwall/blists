@@ -409,8 +409,11 @@ static int decode_header(struct mime_ctx *ctx, const char *header, size_t length
 			continue;
 		if (q >= end || *q != '=')
 			continue;
+#if 0
+/* RFC 2047: "An 'encoded-word' may not be more than 75 characters long" */
 		if (q + 1 - (p - 1) > 75)
 			continue;
+#endif
 		/* skip adjacent linear-white-space between previous
 		 * encoded-word */
 		r = --p;
