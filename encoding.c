@@ -33,6 +33,7 @@ static const char *charset_whitelist[] = {
 	"gb2312$",
 	"gbk$",
 	"gb18030$",
+	"iso-2022-jp$",
 	"utf-8", /* redundant in enc_to_utf8(), may be needed elsewhere */
 	NULL
 };
