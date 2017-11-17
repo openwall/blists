@@ -133,14 +133,15 @@ static void buffer_append_filename(struct buffer *dst, const char *fn, int text)
 	if (!fn || !*fn)
 		fn = "attachment";
 
+	char prev = 0;
 	const char *p;
 	for (p = fn; *p && p - fn < MAX_FILENAME_LENGTH; p++) {
 		if ((*p >= 'a' && *p <= 'z') ||
 		    (*p >= 'A' && *p <= 'Z') ||
 		    (*p >= '0' && *p <= '9'))
-			buffer_appendc(dst, *p);
-		else if (p == fn || *(dst->ptr - 1) != '_')
-			buffer_appendc(dst, '_');
+			buffer_appendc(dst, prev = *p);
+		else if (prev != '_')
+			buffer_appendc(dst, prev = '_');
 	}
 	buffer_appends(dst, text ? ".txt" : ".bin");
 }
