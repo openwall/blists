@@ -91,6 +91,11 @@ static void test_encoded_words(void)
 	test_decode_header("=?KOI8-R?Q?=D4=C5=D3=D4?=", "\xd1\x82\xd0\xb5\xd1\x81\xd1\x82");
 	test_decode_header("=?CP1251?q?=F2=E5=F1=F2?=", "\xd1\x82\xd0\xb5\xd1\x81\xd1\x82");
 
+#if 1
+	/* lowercase hex - formally illegal, but encouraged to decode */
+	test_decode_header("=?KOI8-R?Q?=d4=c5=d3=d4?=", "\xd1\x82\xd0\xb5\xd1\x81\xd1\x82");
+#endif
+
 	/* truncations of the above to test other cases in base64 decoding */
 	test_decode_header("=?koi8-r?B?1MU=?=",         "\xd1\x82\xd0\xb5");
 	test_decode_header("=?koi8-r?B?1MXT?=",         "\xd1\x82\xd0\xb5\xd1\x81");

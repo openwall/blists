@@ -217,9 +217,16 @@ static void process_header(struct mime_ctx *ctx, char *header)
 static void decode_qp(struct buffer *dst, const char *encoded, size_t length,
     int header)
 {
-	static const unsigned char a2i[23] = {
+/* RFC 2045: An "=" followed by two hexadecimal digits, one or both
+ *           of which are lowercase letters in "abcdef", is formally
+ *           illegal. A robust implementation might choose to
+ *           recognize them as the corresponding uppercase letters. */
+	static const unsigned char a2i[55] = {
 		0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
 		16, 16, 16, 16, 16, 16, 16,
+		10, 11, 12, 13, 14, 15,
+		16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16,
+		16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16,
 		10, 11, 12, 13, 14, 15
 	};
 	unsigned char c, *p, *end;
