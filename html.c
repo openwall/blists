@@ -130,16 +130,16 @@ static const char *detect_url(const char *what, const char *colon, const char *e
 
 static void buffer_append_filename(struct buffer *dst, const char *fn, int text)
 {
-	size_t i;
-
 	if (!fn || !*fn)
 		fn = "attachment";
-	for (i = 0; i < MAX_FILENAME_LENGTH && *fn; ++fn, ++i) {
-		if ((*fn >= '0' && *fn <= '9') ||
-		    (*fn >= 'a' && *fn <= 'z') ||
-		    (*fn >= 'A' && *fn <= 'Z'))
-			buffer_appendc(dst, *fn);
-		else
+
+	const char *p;
+	for (p = fn; *p && p - fn < MAX_FILENAME_LENGTH; p++) {
+		if ((*p >= 'a' && *p <= 'z') ||
+		    (*p >= 'A' && *p <= 'Z') ||
+		    (*p >= '0' && *p <= '9'))
+			buffer_appendc(dst, *p);
+		else if (p == fn || *(dst->ptr - 1) != '_')
 			buffer_appendc(dst, '_');
 	}
 	buffer_appends(dst, text ? ".txt" : ".bin");
