@@ -803,7 +803,7 @@ static void output_strings(struct buffer *dst, struct idx_message *m, int close_
 		subj_len = 0;
 
 	if (subj_len) {
-		trunc = (m->flags & IDX_F_SUBJECT_TRUNC) || enc_utf8_remove_partial(subj, &subj_len);
+		trunc = (m->flags & IDX_F_SUBJECT_TRUNC) | enc_utf8_remove_partial(subj, &subj_len);
 		buffer_append_html(dst, subj, subj_len);
 		if (trunc)
 			buffer_appends(dst, "&hellip;");
@@ -813,7 +813,7 @@ static void output_strings(struct buffer *dst, struct idx_message *m, int close_
 	if (close_a)
 		buffer_appends(dst, "</a>");
 	buffer_appends(dst, " (");
-	trunc = (m->flags & IDX_F_FROM_TRUNC) || enc_utf8_remove_partial(from, &from_len);
+	trunc = (m->flags & IDX_F_FROM_TRUNC) | enc_utf8_remove_partial(from, &from_len);
 	buffer_append_html(dst, from, from_len);
 	if (trunc)
 		buffer_appends(dst, "&hellip;");
