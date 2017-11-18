@@ -24,8 +24,8 @@
 
 static const char *charset_whitelist[] = {
 	"us-ascii$",
-	"iso",
-	"utf-7",
+	"iso-8859-",
+	"utf-7$",
 	"koi8-r$",
 	"koi8-u$",
 	"windows-",
@@ -33,8 +33,9 @@ static const char *charset_whitelist[] = {
 	"gb2312$",
 	"gbk$",
 	"gb18030$",
+	"big5$",
 	"iso-2022-jp$",
-	"utf-8", /* redundant in enc_to_utf8(), may be needed elsewhere */
+	"utf-8$", /* redundant in enc_to_utf8(), may be needed elsewhere */
 	NULL
 };
 
@@ -47,19 +48,16 @@ static inline int simple_tolower(char ch)
 
 static int match_charset(const char *charset, const char *mask)
 {
-	unsigned int i;
-
 	for (; *mask; mask++, charset++) {
 		if (*mask == '$')
 			return !*charset;
 		if (*mask != simple_tolower(*charset))
 			return 0;
 	}
-	/* allow eight chars of digits and dashes */
+	/* allow up to 8 digits */
+	unsigned int i;
 	for (i = 0; *charset && i < 8; i++, charset++) {
-		char ch = *charset;
-
-		if (!((ch >= '0' && ch <= '9') || ch == '-'))
+		if (*charset < '0' || *charset > '9')
 			return 0;
 	}
 	return !*charset;
