@@ -42,7 +42,13 @@ extern ssize_t write_loop(int fd, const void *buffer, size_t count);
 extern char *concat(const char *s1, ...);
 
 /* fprintf on stderr but only if it is a tty */
-extern void logtty(const char *fmt, ...);
+extern void logtty(const char *fmt, ...)
+#ifdef __GNUC__
+	__attribute__ ((format (printf, 1, 2)));
+#else
+	;
+#endif
+
 extern void log_percentage(off_t offset, off_t size);
 
 #endif
