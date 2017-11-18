@@ -284,7 +284,7 @@ retry:
 			    "%u -> %u (%04u/%02u/%02u), sorting... ",
 			    prev_aday, aday, MIN_YEAR + m->y, m->m, m->d);
 			qsort(msgs, msg_num, sizeof(*msgs), cmp_msgs_by_day);
-			fprintf(stderr, "done.\n");
+			fprintf(stderr, "done\n");
 			start_from = 0;
 			goto retry;
 		}
@@ -738,7 +738,7 @@ int mailbox_parse(const char *mailbox)
 	if (!error && (idx_fd = open(idx, O_RDWR)) >= 0) {
 		error = lock_fd(idx_fd, 1);
 		if (!error && idx_check_header(idx_fd, &inc_ofs)) {
-			logtty("Incompatible index (needs rebuild).\n");
+			logtty("Incompatible index (needs rebuild)\n");
 			error = 1;
 		}
 
@@ -747,7 +747,7 @@ int mailbox_parse(const char *mailbox)
 
 			/* if mbox is unmodified, exit w/o error */
 			if (!fstat(fd, &st) && inc_ofs == st.st_size) {
-				logtty("Mbox is unmodified (%lu).\n", inc_ofs);
+				logtty("mbox is unmodified (%llu)\n", (unsigned long long)inc_ofs);
 				unlock_fd(idx_fd);
 				close(idx_fd);
 				unlock_fd(fd);
@@ -832,7 +832,7 @@ int mailbox_parse(const char *mailbox)
 
 	if (!error) {
 		error = ftruncate(idx_fd, idx_size) != 0;
-		logtty("Done.\n");
+		logtty("Done\n");
 	}
 
 	if (idx_fd >= 0) {
