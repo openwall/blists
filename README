@@ -20,7 +20,7 @@ example, you may invoke it from a .procmailrc file like this:
     {
       :0 c
       Mail/listname
-
+      
       :0
       | /usr/bin/bindex Mail/listname
     }
