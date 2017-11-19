@@ -762,7 +762,7 @@ int html_attachment(const char *list, unsigned int y, unsigned int m, unsigned i
 		buffer_appends(&dst, "\"\n");
 
 		body = mime_decode_body(&mime, RECODE_NO, &bend);
-		if (!body || bend >= src.end) {
+		if (trunc && (!body || bend >= src.end)) {
 			error_msg = "Attachment is truncated";
 			break;
 		}
