@@ -71,6 +71,12 @@ int main(int argc, char **argv)
 		goto bad_syntax;
 	}
 
+	const char *q;
+	for (q = p; *q; q++) {
+		if (q - p > 30 || ((*p < '0' || *p > '9') && *p != '/'))
+			goto bad_syntax;
+	}
+
 	nul = '\0';
 	if (html_flags == HTML_ATTACHMENT) {
 		if (sscanf(p, "%u/%u/%u/%u/%u%c", &y, &m, &d, &n, &a, &nul) >= 5 && !nul)
