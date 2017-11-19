@@ -64,11 +64,12 @@ int main(int argc, char **argv)
 		    (*p >= '0' && *p <= '9') ||
 		    (p != list && *p == '-'))
 			continue;
-		if (*p == '/')
+		if (*p == '/') {
+			*p++ = '\0';
 			break;
+		}
 		goto bad_syntax;
 	}
-	*p++ = '\0';
 
 	nul = '\0';
 	if (html_flags == HTML_ATTACHMENT) {
