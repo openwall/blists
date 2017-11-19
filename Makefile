@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2006,2008,2011 Solar Designer <solar at openwall.com>
+# Copyright (c) 2006,2008,2011,2017 Solar Designer <solar at openwall.com>
 # Copyright (c) 2014,2017 ABC <abc at openwall.com>
 #
 # Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@ all: $(PROJ)
 check: all tests
 tests: test
 test:
-	make -C tests
+	$(MAKE) -C tests
 
 bindex: $(OBJS_BINDEX) $(OBJS_COMMON)
 	$(LD) $(LDFLAGS) $(OBJS_BINDEX) $(OBJS_COMMON) -o $@
@@ -51,4 +51,4 @@ md5/md5.o: md5/md5.c md5/md5.h
 
 clean:
 	$(RM) $(PROJ) $(OBJS_BINDEX) $(OBJS_BIT) $(OBJS_COMMON)
-	-make -C tests clean
+	$(MAKE) -C tests clean
