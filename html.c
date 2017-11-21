@@ -335,19 +335,21 @@ int html_message(const char *list, unsigned int y, unsigned int m, unsigned int 
 	m1r = m1 + n - (1 + 1); /* both m1 and n are 1-based; m1r is 0-based */
 	idx_offset = IDX2MSG(m1r);
 	prev = next = 1;
-	if (m1r >= 1) {
+	if (m1r >= 1) { /* read idx for previous, current, maybe next message */
 		idx_offset -= sizeof(idx_msg[0]);
 		got = idx_read(fd, idx_offset, &idx_msg, sizeof(idx_msg));
-		if (got != sizeof(idx_msg)) {
-			error = got != sizeof(idx_msg[0]) * 2;
+		if (got != sizeof(idx_msg)) { /* not all 3 */
+			error = got != sizeof(idx_msg[0]) * 2; /* must be 2 */
+			if (got == sizeof(idx_msg[0])) /* have only previous */
+				got = 0; /* "No such message", not our error */
 			idx_msg[2] = idx_msg[1];
 			next = 0;
 		}
-	} else {
+	} else { /* read idx for current and maybe next message */
 		prev = 0;
 		got = idx_read(fd, idx_offset, &idx_msg[1], sizeof(idx_msg[1]) * 2);
-		if (got != sizeof(idx_msg[1]) * 2) {
-			error = got != sizeof(idx_msg[1]);
+		if (got != sizeof(idx_msg[1]) * 2) { /* not both */
+			error = got != sizeof(idx_msg[1]); /* must be 1 */
 			idx_msg[2] = idx_msg[1];
 			next = 0;
 		}
