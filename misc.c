@@ -2,7 +2,7 @@
  * Miscellaneous system and library call wrappers.
  * See misc.h for the descriptions.
  *
- * Copyright (c) 1998-2008,2017 Solar Designer <solar at openwall.com>
+ * Copyright (c) 1998-2008,2017,2018 Solar Designer <solar at openwall.com>
  * Copyright (c) 2017 ABC <abc at openwall.com>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -24,6 +24,7 @@
 #include <time.h>
 
 #include "params.h"
+#include "misc.h"
 
 void logtty(const char *fmt, ...)
 {
