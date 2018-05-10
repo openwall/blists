@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006,2008,2009,2015,2017 Solar Designer <solar at openwall.com>
+ * Copyright (c) 2006,2008,2009,2015,2017,2018 Solar Designer <solar at openwall.com>
  * Copyright (c) 2011,2014,2017 ABC <abc at openwall.com>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -109,13 +109,8 @@ static const char *detect_url(const char *what, const char *colon, const char *e
 	     *ptr == '(' || *ptr == ')' || *ptr == '*' || *ptr == '+' ||
 	     *ptr == ',' || *ptr == ';' || *ptr == '=' ||
 	     *ptr == ':' || *ptr == '@' ||
-	     *ptr == '?' || *ptr == '#')) {
-		/* Let's not detect URLs with likely e-mail addresses because
-		 * we'd need to obfuscate the addresses, breaking the URLs. */
-		if (*ptr == '@')
-			return NULL;
+	     *ptr == '?' || *ptr == '#'))
 		ptr++;
-	}
 
 	/* These characters are unlikely to be part of the URL in practice */
 	while (--ptr > hostname &&
@@ -146,7 +141,11 @@ static void buffer_append_filename(struct buffer *dst, const char *fn, int text)
 	buffer_appends(dst, text ? ".txt" : ".bin");
 }
 
-static void buffer_append_html_generic(struct buffer *dst, const char *what, size_t length, int quotes, int detect_urls)
+#define BAH_QUOTE			1
+#define BAH_DETECT_URLS			2
+#define BAH_OBFUSCATE			4
+
+static void buffer_append_html_generic(struct buffer *dst, const char *what, size_t length, int flags)
 {
 	const char *ptr, *end, *url;
 	size_t url_length;
@@ -168,24 +167,24 @@ static void buffer_append_html_generic(struct buffer *dst, const char *what, siz
 			buffer_appends(dst, "&amp;");
 			break;
 		case '"':
-			if (quotes)
+			if (flags & BAH_QUOTE)
 				buffer_appends(dst, "&quot;");
 			else
 				buffer_appendc(dst, c);
 			break;
 		case ':':
 			url = NULL;
-			if (detect_urls && ptr < end && *ptr == '/')
+			if ((flags & BAH_DETECT_URLS) && ptr < end && *ptr == '/')
 				url = detect_url(what, ptr - 1, end, &url_length, &url_safe);
 			if (url && url_length <= MAX_URL_LENGTH && dst->ptr - dst->start >= ptr - 1 - url) {
 				dst->ptr -= ptr - 1 - url;
 				buffer_appends(dst, "<a href=\"");
-				buffer_append_html_generic(dst, url, url_length, 1, 0);
+				buffer_append_html_generic(dst, url, url_length, BAH_QUOTE);
 				if (url_safe)
 					buffer_appends(dst, "\">");
 				else
 					buffer_appends(dst, "\" rel=\"nofollow\">");
-				buffer_append_html_generic(dst, url, url_length, 0, 0);
+				buffer_append_html_generic(dst, url, url_length, 0);
 				buffer_appends(dst, "</a>");
 				ptr = url + url_length;
 			} else {
@@ -195,8 +194,13 @@ static void buffer_append_html_generic(struct buffer *dst, const char *what, siz
 		case '@':
 			if (ptr - what >= 2 && end - ptr >= 4 &&
 			    *(ptr - 2) > ' ' && *ptr > ' ' && *(ptr + 1) > ' ' && *(ptr + 2) > ' ') {
-				buffer_appends(dst, "&#64;...");
-				ptr += 3;
+				if (flags & BAH_OBFUSCATE) {
+					buffer_appends(dst, "&#64;...");
+					ptr += 3;
+				} else {
+					/* Always do harmless obfuscation */
+					buffer_appends(dst, "&#64;");
+				}
 				break;
 			}
 			/* FALLTHRU */
@@ -216,7 +220,7 @@ static void buffer_append_html_generic(struct buffer *dst, const char *what, siz
 
 static void buffer_append_html(struct buffer *dst, const char *what, size_t length)
 {
-	buffer_append_html_generic(dst, what, length, 0, 0);
+	buffer_append_html_generic(dst, what, length, BAH_OBFUSCATE);
 }
 
 static void buffer_appends_html(struct buffer *dst, const char *what)
@@ -601,7 +605,7 @@ int html_message(const char *list, unsigned int y, unsigned int m, unsigned int 
 			}
 			/* inline */
 			buffer_appendc(&dst, '\n');
-			buffer_append_html_generic(&dst, body, mime.dst.ptr - body, 0, 1);
+			buffer_append_html_generic(&dst, body, mime.dst.ptr - body, BAH_DETECT_URLS | BAH_OBFUSCATE);
 			mime.dst.ptr = body;
 		} while (bend < src.end && mime.entities);
 
