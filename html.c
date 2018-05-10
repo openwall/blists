@@ -125,8 +125,27 @@ static const char *detect_url(const char *what, const char *colon, const char *e
 
 static int detect_email(const char *what, const char *at, const char *end)
 {
-	return at > what && end - at > 4 &&
-	    *(at - 1) > ' ' && *(at + 1) > ' ' && *(at + 2) > ' ' && *(at + 3) > ' ';
+	const char *ptr;
+
+	if (at <= what || end - at <= 4)
+		return 0;
+
+	/* At-sign where expected, or RFC 5322 dot-atom excluding CFWS */
+	for (ptr = at - 1; ptr <= at + 4; ptr++) {
+		if ((ptr == at && *ptr == '@') ||
+		    ((*ptr >= 'a' && *ptr <= 'z') ||
+		     (*ptr >= 'A' && *ptr <= 'Z') ||
+		     (*ptr >= '0' && *ptr <= '9') ||
+		     *ptr == '!' || *ptr == '#' || *ptr == '$' || *ptr == '%' ||
+		     *ptr == '&' || *ptr == '\'' || *ptr == '*' || *ptr == '+' ||
+		     *ptr == '-' || *ptr == '/' || *ptr == '=' || *ptr == '?' ||
+		     *ptr == '^' || *ptr == '_' || *ptr == '`' || *ptr == '{' ||
+		     *ptr == '|' || *ptr == '}' || *ptr == '~' || *ptr == '.'))
+			continue;
+		return 0;
+	}
+
+	return 1;
 }
 
 static void buffer_append_filename(struct buffer *dst, const char *fn, int text)
