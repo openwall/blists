@@ -123,6 +123,12 @@ static const char *detect_url(const char *what, const char *colon, const char *e
 	return url;
 }
 
+static int detect_email(const char *what, const char *at, const char *end)
+{
+	return at > what && end - at > 4 &&
+	    *(at - 1) > ' ' && *(at + 1) > ' ' && *(at + 2) > ' ' && *(at + 3) > ' ';
+}
+
 static void buffer_append_filename(struct buffer *dst, const char *fn, int text)
 {
 	if (!fn || !*fn)
@@ -192,8 +198,7 @@ static void buffer_append_html_generic(struct buffer *dst, const char *what, siz
 			}
 			break;
 		case '@':
-			if (ptr - what >= 2 && end - ptr >= 4 &&
-			    *(ptr - 2) > ' ' && *ptr > ' ' && *(ptr + 1) > ' ' && *(ptr + 2) > ' ') {
+			if (detect_email(what, ptr - 1, end)) {
 				if (flags & BAH_OBFUSCATE) {
 					buffer_appends(dst, "&#64;...");
 					ptr += 3;
