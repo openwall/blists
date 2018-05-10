@@ -36,6 +36,36 @@ static const char * const month_name[] = {
 	"July", "August", "September", "October", "November", "December"
 };
 
+struct match_charset {
+	int initialized;
+	char match[0x80];
+};
+
+static struct match_charset match_alnum;
+
+static void match_char_init(struct match_charset *match, const char *ranges, const char *chars)
+{
+	if (match->initialized)
+		return;
+
+	while (*ranges) {
+		unsigned char c = ranges[0];
+		while (c <= (unsigned char)ranges[1])
+			match->match[c++] = 1;
+		ranges += 2;
+	}
+
+	while (*chars)
+		match->match[(unsigned char)*chars++] = 1;
+
+	match->initialized = 1;
+}
+
+static inline int match_char(const struct match_charset *match, unsigned char c)
+{
+	return c <= 0x7f ? match->match[c] : 0;
+}
+
 /*
  * Checks if the hostname ending just before end belongs to domain.
  */
@@ -67,12 +97,12 @@ static const char *detect_url(const char *what, const char *colon, const char *e
 	if (memcmp(colon, "://", 3))
 		return NULL;
 
+	match_char_init(&match_alnum, "azAZ09", "");
+
 	ptr = hostname = colon + 3;
 	while (ptr < end &&
-	    ((*ptr >= 'a' && *ptr <= 'z') ||
-	     (*ptr >= 'A' && *ptr <= 'Z') ||
-	     (*ptr >= '0' && *ptr <= '9') ||
-	     ((*ptr == '-' || *ptr == '.') && ptr > hostname)))
+	    (match_char(&match_alnum, *ptr) ||
+	    ((*ptr == '-' || *ptr == '.') && ptr > hostname)))
 		ptr++;
 	while (ptr > hostname && *(ptr - 1) == '.')
 		ptr--;
@@ -98,24 +128,15 @@ static const char *detect_url(const char *what, const char *colon, const char *e
 	}
 
 	/* RFC 3986 path-abempty [ "?" query ] [ "#" fragment ] */
-	while (ptr < end &&
-	    ((*ptr >= 'a' && *ptr <= 'z') ||
-	     (*ptr >= 'A' && *ptr <= 'Z') ||
-	     (*ptr >= '0' && *ptr <= '9') ||
-	     *ptr == '/' ||
-	     *ptr == '-' || *ptr == '.' || *ptr == '_' || *ptr == '~' ||
-	     *ptr == '%' ||
-	     *ptr == '!' || *ptr == '$' || *ptr == '&' || *ptr == '\'' ||
-	     *ptr == '(' || *ptr == ')' || *ptr == '*' || *ptr == '+' ||
-	     *ptr == ',' || *ptr == ';' || *ptr == '=' ||
-	     *ptr == ':' || *ptr == '@' ||
-	     *ptr == '?' || *ptr == '#'))
+	static struct match_charset match_path;
+	match_char_init(&match_path, "azAZ09", "/-._~%!$&\'()*+,;=:@?#");
+	while (ptr < end && match_char(&match_path, *ptr))
 		ptr++;
 
 	/* These characters are unlikely to be part of the URL in practice */
-	while (--ptr > hostname &&
-	    (*ptr == '.' || *ptr == '!' || *ptr == ')' || *ptr == ',' ||
-	     *ptr == ';' || *ptr == ':' || *ptr == '?'))
+	static struct match_charset match_pathend;
+	match_char_init(&match_pathend, "", ".!),;:?");
+	while (--ptr > hostname && match_char(&match_pathend, *ptr))
 		;
 	ptr++;
 
@@ -131,16 +152,10 @@ static int detect_email(const char *what, const char *at, const char *end)
 		return 0;
 
 	/* At-sign where expected, or RFC 5322 dot-atom excluding CFWS */
+	static struct match_charset match_atom;
+	match_char_init(&match_atom, "azAZ09", "!#$%&\'*+-/=?^_`{|}~.");
 	for (ptr = at - 1; ptr <= at + 4; ptr++) {
-		if ((ptr == at && *ptr == '@') ||
-		    ((*ptr >= 'a' && *ptr <= 'z') ||
-		     (*ptr >= 'A' && *ptr <= 'Z') ||
-		     (*ptr >= '0' && *ptr <= '9') ||
-		     *ptr == '!' || *ptr == '#' || *ptr == '$' || *ptr == '%' ||
-		     *ptr == '&' || *ptr == '\'' || *ptr == '*' || *ptr == '+' ||
-		     *ptr == '-' || *ptr == '/' || *ptr == '=' || *ptr == '?' ||
-		     *ptr == '^' || *ptr == '_' || *ptr == '`' || *ptr == '{' ||
-		     *ptr == '|' || *ptr == '}' || *ptr == '~' || *ptr == '.'))
+		if ((ptr == at && *ptr == '@') || match_char(&match_atom, *ptr))
 			continue;
 		return 0;
 	}
@@ -153,12 +168,12 @@ static void buffer_append_filename(struct buffer *dst, const char *fn, int text)
 	if (!fn || !*fn)
 		fn = "attachment";
 
+	match_char_init(&match_alnum, "azAZ09", "");
+
 	char prev = 0;
 	const char *p;
 	for (p = fn; *p && p - fn < MAX_FILENAME_LENGTH; p++) {
-		if ((*p >= 'a' && *p <= 'z') ||
-		    (*p >= 'A' && *p <= 'Z') ||
-		    (*p >= '0' && *p <= '9'))
+		if (match_char(&match_alnum, *p))
 			buffer_appendc(dst, prev = *p);
 		else if (prev != '_')
 			buffer_appendc(dst, prev = '_');
