@@ -14,8 +14,8 @@
 #include <stdlib.h>
 
 #include "buffer.h"
-#include "mime.h"
 #include "encoding.h"
+#include "mime.h"
 
 static int new_entity(struct mime_ctx *ctx)
 {

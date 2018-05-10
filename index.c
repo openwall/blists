@@ -15,8 +15,8 @@
 #include <string.h>
 #include <errno.h>
 
-#include "index.h"
 #include "misc.h"
+#include "index.h"
 
 #define IDX_TAG "blists"
 #define IDX_REVISION 2

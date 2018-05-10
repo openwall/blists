@@ -20,9 +20,9 @@
 #include "index.h"
 #include "buffer.h"
 #include "mime.h"
+#include "encoding.h"
 #include "misc.h"
 #include "html.h"
-#include "encoding.h"
 
 int html_flags = HTML_BODY;
 
