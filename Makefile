@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2006,2008,2011,2017 Solar Designer <solar at openwall.com>
+# Copyright (c) 2006,2008,2011,2017,2018 Solar Designer <solar at openwall.com>
 # Copyright (c) 2014,2017 ABC <abc at openwall.com>
 #
 # Redistribution and use in source and binary forms, with or without
@@ -34,14 +34,14 @@ bit: $(OBJS_BIT) $(OBJS_COMMON)
 	$(LD) $(LDFLAGS) $(OBJS_BIT) $(OBJS_COMMON) -o $@
 
 bindex.o: mailbox.h
-bit.o: params.h html.h
+bit.o: html.h
 buffer.o: buffer.h
 encoding.o: encoding.h buffer.h
-mime.o: mime.h buffer.h encoding.h
-html.o: params.h index.h mime.h buffer.h misc.h html.h
-mailbox.o: params.h index.h mime.h buffer.h misc.h
-misc.o: params.h
-index.o: params.h index.h
+html.o: html.h buffer.h encoding.h index.h mime.h misc.h params.h
+index.o: index.h misc.h params.h
+mailbox.o: mailbox.h buffer.h index.h mime.h misc.h params.h md5/md5.h
+mime.o: mime.h buffer.h encoding.h params.h
+misc.o: misc.h params.h
 
 md5/md5.o: md5/md5.c md5/md5.h
 	$(CC) $(CFLAGS) -c md5/md5.c -o md5/md5.o
