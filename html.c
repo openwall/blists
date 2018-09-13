@@ -335,6 +335,12 @@ static int is_inline(struct mime_ctx *mime)
 	return 0; /* do not show */
 }
 
+static void html_append_meta(struct buffer *dst)
+{
+	if (html_flags & HTML_CENSOR)
+		buffer_appends(dst, "<meta name=\"robots\" content=\"noindex\">\n");
+}
+
 int html_message(const char *list, unsigned int y, unsigned int m, unsigned int d, unsigned int n)
 {
 	unsigned int aday, n0, n2;
@@ -526,8 +532,7 @@ int html_message(const char *list, unsigned int y, unsigned int m, unsigned int 
 			buffer_appends_html(&dst, subject + 9);
 		}
 		buffer_appends(&dst, "</title>\n");
-		if (html_flags & HTML_CENSOR)
-			buffer_appends(&dst, "<meta name=\"robots\" content=\"noindex\">\n");
+		html_append_meta(&dst);
 	}
 
 	if (html_flags & HTML_BODY) {
@@ -934,6 +939,7 @@ int html_day_index(const char *list, unsigned int y, unsigned int m, unsigned in
 		buffer_appends(&dst, "<title>");
 		buffer_appends_html(&dst, list);
 		buffer_appendf(&dst, " mailing list - %u/%02u/%02u</title>\n", y, m, d);
+		html_append_meta(&dst);
 	}
 
 	if (html_flags & HTML_BODY) {
@@ -1117,6 +1123,7 @@ int html_month_index(const char *list, unsigned int y, unsigned int m)
 		buffer_appends(&dst, "<title>");
 		buffer_appends_html(&dst, list);
 		buffer_appendf(&dst, " mailing list - %u/%02u</title>\n", y, m);
+		html_append_meta(&dst);
 	}
 
 	if (html_flags & HTML_BODY) {
@@ -1324,6 +1331,7 @@ int html_year_index(const char *list, unsigned int y)
 		if (min_y == max_y)
 			buffer_appendf(&dst, " - %u", y);
 		buffer_appends(&dst, "</title>\n");
+		html_append_meta(&dst);
 	}
 
 	if (html_flags & HTML_BODY) {
