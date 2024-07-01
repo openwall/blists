@@ -329,8 +329,9 @@ static int is_inline(struct mime_ctx *mime)
 {
 	if (!is_attachment(mime) &&
 	    mime->entities->disposition != CONTENT_ATTACHMENT &&
-	    !strncasecmp(mime->entities->type, "text/", 5) &&
-	    strcasecmp(mime->entities->type, "text/html"))
+	    ((!strncasecmp(mime->entities->type, "text/", 5) &&
+	    strcasecmp(mime->entities->type, "text/html")) ||
+	    !strcasecmp(mime->entities->type, "message/rfc822")))
 		return 1; /* show */
 	return 0; /* do not show */
 }
