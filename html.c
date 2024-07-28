@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006,2008,2009,2015,2017,2018 Solar Designer <solar at openwall.com>
+ * Copyright (c) 2006,2008,2009,2015,2017,2018,2024 Solar Designer <solar at openwall.com>
  * Copyright (c) 2011,2014,2017 ABC <abc at openwall.com>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -354,7 +354,7 @@ int html_message(const char *list, unsigned int y, unsigned int m, unsigned int 
 	idx_size_t size;
 	struct buffer src, dst;
 	struct mime_ctx mime;
-	char *p, *q, *date, *from, *to, *cc, *subject, *body, *bend;
+	char *p, *q, *message_id, *date, *from, *to, *cc, *subject, *body, *bend;
 
 	if (y < MIN_YEAR || y > MAX_YEAR ||
 	    m < 1 || m > 12 ||
@@ -461,9 +461,16 @@ int html_message(const char *list, unsigned int y, unsigned int m, unsigned int 
 		return html_error(NULL);
 	}
 
-	date = from = to = cc = subject = body = NULL;
-	while (src.end - src.ptr > 9 && *src.ptr != '\n') {
+	message_id = date = from = to = cc = subject = body = NULL;
+	while (src.end - src.ptr > 12 && *src.ptr != '\n') {
 		switch (*src.ptr) {
+		case 'M':
+		case 'm':
+			if (!strncasecmp(src.ptr, "Message-ID:", 11)) {
+				message_id = mime_decode_header(&mime);
+				continue;
+			}
+			break;
 		case 'D':
 		case 'd':
 			if (!strncasecmp(src.ptr, "Date:", 5)) {
@@ -578,6 +585,11 @@ int html_message(const char *list, unsigned int y, unsigned int m, unsigned int 
 		    " <a href=\"../../..\">[list]</a>\n");
 
 		buffer_appends(&dst, "<pre style=\"white-space: pre-wrap\">\n");
+
+		if (message_id) {
+			buffer_append_html_generic(&dst, message_id, strlen(message_id), 0);
+			buffer_appendc(&dst, '\n');
+		}
 		if (date)
 			buffer_append_header(&dst, date);
 		if (from)
