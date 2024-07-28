@@ -28,8 +28,8 @@ int html_flags = HTML_BODY;
 
 /* Please don't remove this (although you may) */
 static const char * const footer =
-	"<p><a href=\"http://www.openwall.com/blists/\">Powered by blists</a>"
-	" - <a href=\"http://lists.openwall.net\">more mailing lists</a>\n";
+	"<p><a href=\"https://www.openwall.com/blists/\">Powered by blists</a>"
+	" - <a href=\"https://lists.openwall.net\">more mailing lists</a>\n";
 
 static const char * const month_name[] = {
 	"January", "February", "March", "April", "May", "June",

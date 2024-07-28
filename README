@@ -3,9 +3,9 @@ indexed mbox files.  There are two programs: bindex and bit.  bindex
 generates or updates the index file (yes, incremental updates are
 supported).  bit is a CGI program, which generates web pages on the fly.
 
-  blists homepage: http://www.openwall.com/blists/
+  blists homepage: https://www.openwall.com/blists/
   Live example with a high volume mailing list:
-      http://lists.openwall.net/linux-kernel/
+      https://lists.openwall.net/linux-kernel/
 
 To compile, simply run "make".  There's currently no "install" target;
 you're supposed to copy the bindex and bit programs in place on your
@@ -91,7 +91,7 @@ Direct call to bit is required to set HTTP headers for attachments.
 To workaround a bug in Lynx where it would omit the trailing slash when
 following links to "..", add:
 
-    RewriteRule ^[a-z-]+([/0-9]*[0-9])?$ http://%{SERVER_NAME}%{REQUEST_URI}/ [R,L]
+    RewriteRule ^[a-z-]+([/0-9]*[0-9])?$ https://%{SERVER_NAME}%{REQUEST_URI}/ [R,L]
 
 (where "[a-z-]+" is supposed to match your list names; adjust it if
 not).
