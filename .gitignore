@@ -1,0 +1,4 @@
+*.o
+bindex
+bit
+tests/tests
