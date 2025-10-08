@@ -11,7 +11,7 @@ CC = gcc
 LD = $(CC)
 RM = rm -f
 MKDIR = mkdir -p
-CFLAGS = -c -Wall -O2 -fomit-frame-pointer -D_FILE_OFFSET_BITS=64
+CFLAGS = -Wall -O2 -fomit-frame-pointer -D_FILE_OFFSET_BITS=64
 LDFLAGS = -s
 
 PROJ = tests
@@ -28,7 +28,7 @@ tests: $(OBJS_COMMON)
 tests.o: ../*.c ../*.h
 
 .c.o:
-	$(CC) $(CFLAGS) $*.c
+	$(CC) $(CFLAGS) -c $*.c
 
 clean:
 	$(RM) $(PROJ) $(OBJS_COMMON)

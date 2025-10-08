@@ -12,7 +12,7 @@ CC = gcc
 LD = $(CC)
 RM = rm -f
 MKDIR = mkdir -p
-CFLAGS = -c -Wall -O2 -fomit-frame-pointer -D_FILE_OFFSET_BITS=64
+CFLAGS = -Wall -O2 -fomit-frame-pointer -D_FILE_OFFSET_BITS=64
 LDFLAGS = -s
 
 PROJ = bindex bit
@@ -47,7 +47,7 @@ md5/md5.o: md5/md5.c md5/md5.h
 	$(CC) $(CFLAGS) -c md5/md5.c -o md5/md5.o
 
 .c.o:
-	$(CC) $(CFLAGS) $*.c
+	$(CC) $(CFLAGS) -c $*.c
 
 clean:
 	$(RM) $(PROJ) $(OBJS_BINDEX) $(OBJS_BIT) $(OBJS_COMMON)
