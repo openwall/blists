@@ -267,7 +267,7 @@ static void test_multipart()
 		mime_skip_header(&mime);
 	}
 	if (*src.ptr == '\n')
-	       	body = ++src.ptr;
+		body = ++src.ptr;
 
 	part = 0;
 	do {
