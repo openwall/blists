@@ -202,7 +202,7 @@ static void test_process_header()
 	if (!entity->boundary || strcmp(entity->boundary, "=BOUNDARY="))
 		errx(1, "  boundary is wrong (%s)\n", entity->boundary);
 	if (!entity->filename)
-		errx(1, "  filename is wrong (%s)\n", entity->filename);
+		errx(1, "  filename is NULL\n");
 	if (entity->disposition != CONTENT_UNSET)
 		errx(1, "  disposition is wrong (%d)\n",
 		    entity->disposition);
@@ -338,7 +338,7 @@ static void test_multipart()
 	mime_free(&mime);
 }
 
-int main(int argc, char **argv)
+int main(void)
 {
 	printf("Unit-test for blists\n");
 	test_encoded_words();
