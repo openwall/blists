@@ -29,6 +29,7 @@
 #define IDX_F_HAVE_IRT			2
 #define IDX_F_FROM_TRUNC		4
 #define IDX_F_SUBJECT_TRUNC		8
+#define IDX_F_HAVE_REF_BASE		16 /* and 32, 64 */
 
 #define IDX_STRINGS_SIZE		160
 #define IDX_SUBJECT_MINGUALEN		120

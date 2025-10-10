@@ -128,6 +128,7 @@ static int message_process(struct parsed_message *msg)
 		memcpy(idx_msg->irt_hash, msg->irt_hash,
 		    sizeof(idx_msg->irt_hash));
 		idx_msg->flags |= IDX_F_HAVE_IRT;
+		idx_msg->flags |= IDX_F_HAVE_REF_BASE * msg->have_irt;
 	}
 
 	p = idx_msg->strings;
@@ -207,6 +208,10 @@ static int msgs_link(void)
 		hi = 1;
 		do {
 			hi &= 3; /* 1, 2, 0 */
+			if (hi != 1 && !(m->flags & (IDX_F_HAVE_REF_BASE << hi))) {
+				irt = NULL;
+				continue;
+			}
 			hv = m->irt_hash[hi][0] | ((unsigned int)m->irt_hash[hi][1] << 8);
 			irt = hash[hv];
 			while (irt) {
@@ -624,7 +629,7 @@ static int mailbox_parse_fd(int fd)
 						msg.have_msgid = 1;
 					} else {
 						message_header_hash(p, q, &msg.irt_hash[1]);
-						msg.have_irt = 1;
+						msg.have_irt |= 1 << 1;
 					}
 					continue;
 				}
@@ -648,7 +653,7 @@ static int mailbox_parse_fd(int fd)
 							p++;
 					} while (*p);
 					for (hi = 0; hi < 3; hi++) {
-						if (hi == 1 && msg.have_irt)
+						if (msg.have_irt & (1 << hi))
 							continue;
 						if (!(q = p = last[hi]))
 							continue;
@@ -657,8 +662,7 @@ static int mailbox_parse_fd(int fd)
 						if (!*q || q - p < 4)
 							continue;
 						message_header_hash(p, q, &msg.irt_hash[hi]);
-						if (hi == 1)
-							msg.have_irt = 1;
+						msg.have_irt |= 1 << hi;
 					}
 					continue;
 				}
