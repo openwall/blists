@@ -36,7 +36,7 @@
 typedef int idx_msgnum_t;
 typedef off_t idx_off_t;
 typedef off_t idx_size_t;
-typedef unsigned char idx_hash_t[16];
+typedef unsigned char idx_hash_t[8];
 typedef unsigned char idx_ymd_t;
 typedef unsigned char idx_flags_t;
 
@@ -44,7 +44,7 @@ struct idx_message {
 	idx_off_t offset;
 	idx_size_t size;
 	idx_hash_t msgid_hash;	/* Message-ID */
-	idx_hash_t irt_hash;	/* In-Reply-To or last References tag */
+	idx_hash_t irt_hash[3];	/* In-Reply-To and last few References */
 	struct {
 		idx_msgnum_t pn; /* prev */
 		idx_msgnum_t nn; /* next */

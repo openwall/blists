@@ -1,7 +1,7 @@
 /*
  * Initial mbox file parsing.
  *
- * Copyright (c) 1998-2003,2006,2008,2010,2011,2015 Solar Designer <solar at openwall.com>
+ * Copyright (c) 1998-2003,2006,2008,2010,2011,2015,2025 Solar Designer <solar at openwall.com>
  * Copyright (c) 2008 Grigoriy Strokin <grg at openwall.com>
  * Copyright (c) 2011,2017 ABC <abc at openwall.com>
  *
@@ -58,7 +58,7 @@ struct parsed_message {
 	idx_size_t raw_size;
 	idx_size_t data_size;
 	struct tm tm;
-	idx_hash_t msgid_hash, irt_hash;
+	idx_hash_t msgid_hash, irt_hash[3];
 	int have_msgid, have_irt;
 	const char *from, *subject;
 };
@@ -204,10 +204,10 @@ static int msgs_link(void)
 	for (i = 0, m = msgs; i < msg_num; i++, m++) {
 		if (!(m->flags & IDX_F_HAVE_IRT))
 			continue;
-		hv = m->irt_hash[0] | ((unsigned int)m->irt_hash[1] << 8);
+		hv = m->irt_hash[1][0] | ((unsigned int)m->irt_hash[1][1] << 8);
 		irt = hash[hv];
 		while (irt) {
-			if (!memcmp(m->irt_hash, irt->msg->msgid_hash, sizeof(idx_hash_t)) && m != irt->msg)
+			if (!memcmp(&m->irt_hash[1], irt->msg->msgid_hash, sizeof(idx_hash_t)) && m != irt->msg)
 				break;
 			irt = irt->next_hash;
 		}
@@ -618,7 +618,7 @@ static int mailbox_parse_fd(int fd)
 						message_header_hash(p, q, &msg.msgid_hash);
 						msg.have_msgid = 1;
 					} else {
-						message_header_hash(p, q, &msg.irt_hash);
+						message_header_hash(p, q, &msg.irt_hash[1]);
 						msg.have_irt = 1;
 					}
 					continue;
@@ -645,7 +645,7 @@ static int mailbox_parse_fd(int fd)
 						q++;
 					if (!*q || q - p < 4)
 						continue;
-					message_header_hash(p, q, &msg.irt_hash);
+					message_header_hash(p, q, &msg.irt_hash[1]);
 					msg.have_irt = 1;
 					continue;
 				}
