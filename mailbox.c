@@ -177,7 +177,7 @@ static int msgs_link(void)
 	struct idx_message *m, *lit, *seen;
 	unsigned int aday;
 	struct mem_message *pool, **hash, *irt;
-	unsigned int hv;
+	unsigned int hv, hi;
 	unsigned int count;
 
 	pool = calloc(msg_num, sizeof(*pool));
@@ -204,14 +204,19 @@ static int msgs_link(void)
 	for (i = 0, m = msgs; i < msg_num; i++, m++) {
 		if (!(m->flags & IDX_F_HAVE_IRT))
 			continue;
-		hv = m->irt_hash[1][0] | ((unsigned int)m->irt_hash[1][1] << 8);
-		irt = hash[hv];
-		while (irt) {
-			if (!memcmp(&m->irt_hash[1], irt->msg->msgid_hash, sizeof(idx_hash_t)) && m != irt->msg)
-				break;
-			irt = irt->next_hash;
-		}
-		if (!irt) continue;
+		hi = 1;
+		do {
+			hi &= 3; /* 1, 2, 0 */
+			hv = m->irt_hash[hi][0] | ((unsigned int)m->irt_hash[hi][1] << 8);
+			irt = hash[hv];
+			while (irt) {
+				if (!memcmp(&m->irt_hash[hi], irt->msg->msgid_hash, sizeof(idx_hash_t)) && m != irt->msg)
+					break;
+				irt = irt->next_hash;
+			}
+		} while (!irt && (hi <<= 1));
+		if (!irt)
+			continue;
 
 /* The following loop could be avoided by maintaining a thread index,
  * including a "last in thread" pointer for each thread, and pointers
@@ -626,27 +631,35 @@ static int mailbox_parse_fd(int fd)
 				break;
 			case 'R':
 			case 'r':
-				if (!msg.have_irt &&
-				    eq(p, l, "References:", 11)) {
-					char *q;
+				if (eq(p, l, "References:", 11)) {
+					char *q, *last[3] = {NULL};
+					unsigned int hi;
 					p = mime_decode_header(&mime);
 					while (*p && *p != '<')
 						p++;
 					if (!*p)
 						continue;
-					/* seek last reference */
+					/* seek last up to 3 references */
 					do {
-						q = ++p;
+						last[0] = last[2];
+						last[2] = last[1];
+						last[1] = ++p;
 						while (*p && *p != '<')
 							p++;
 					} while (*p);
-					p = q;
-					while (*q && *q != '>')
-						q++;
-					if (!*q || q - p < 4)
-						continue;
-					message_header_hash(p, q, &msg.irt_hash[1]);
-					msg.have_irt = 1;
+					for (hi = 0; hi < 3; hi++) {
+						if (hi == 1 && msg.have_irt)
+							continue;
+						if (!(q = p = last[hi]))
+							continue;
+						while (*q && *q != '>')
+							q++;
+						if (!*q || q - p < 4)
+							continue;
+						message_header_hash(p, q, &msg.irt_hash[hi]);
+						if (hi == 1)
+							msg.have_irt = 1;
+					}
 					continue;
 				}
 				break;
