@@ -367,6 +367,16 @@ static off_t begin_inc_idx(int idx_fd, int fd)
 	return inc_ofs;
 }
 
+static void message_header_hash(const char *p, const char *q, idx_hash_t *hash)
+{
+	MD5_CTX ctx;
+	unsigned char hash_full[16];
+	MD5_Init(&ctx);
+	MD5_Update(&ctx, p, q - p);
+	MD5_Final(hash_full, &ctx);
+	memcpy(hash, hash_full, sizeof(*hash));
+}
+
 /*
  * The mailbox parsing routine.
  * We implement a state machine at the line fragment level (that is, full or
@@ -378,7 +388,6 @@ static int mailbox_parse_fd(int fd)
 {
 	struct stat stat;			/* File information */
 	struct parsed_message msg;		/* Message being parsed */
-	MD5_CTX hash;				/* A Message-ID digest */
 	struct buffer premime;			/* Buffered raw headers */
 	struct mime_ctx mime;			/* MIME decoding context */
 	char *file_buffer, *line_buffer;	/* Our internal buffers */
@@ -605,13 +614,11 @@ static int mailbox_parse_fd(int fd)
 						q++;
 					if (!*q || q - p < 4)
 						continue;
-					MD5_Init(&hash);
-					MD5_Update(&hash, p, q - p);
 					if (m) {
-						MD5_Final(msg.msgid_hash, &hash);
+						message_header_hash(p, q, &msg.msgid_hash);
 						msg.have_msgid = 1;
 					} else {
-						MD5_Final(msg.irt_hash, &hash);
+						message_header_hash(p, q, &msg.irt_hash);
 						msg.have_irt = 1;
 					}
 					continue;
@@ -638,9 +645,7 @@ static int mailbox_parse_fd(int fd)
 						q++;
 					if (!*q || q - p < 4)
 						continue;
-					MD5_Init(&hash);
-					MD5_Update(&hash, p, q - p);
-					MD5_Final(msg.irt_hash, &hash);
+					message_header_hash(p, q, &msg.irt_hash);
 					msg.have_irt = 1;
 					continue;
 				}
